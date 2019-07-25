@@ -34,7 +34,7 @@
 
 enum {
     HASH_BUSY = -1,
-    HASH_OK = 0, 
+    HASH_OK = 0,
     HASH_NOT_FOUND = 2,
     HASH_EXPIRED = 3
 };

@@ -48,7 +48,7 @@ typedef struct {
     char *submit_time;    // sbtm
     char *eligible_time;  // eltm
     char *account;        // acct
-    char *cluster;        // clus    
+    char *cluster;        // clus
     char *user_name;      // usnm
     char *group_name;     // grnm
     char *job_name;       // jbnm
@@ -57,10 +57,10 @@ typedef struct {
     char *qos_name;       // qsnm
     char *resv_name;      // rvnm
     char *req_gres;       // rvgr
-    char *wckey;          // wcky 
+    char *wckey;          // wcky
     char *derived_ec;     // dxcd
     char *exit_code;      // excd
-    char *work_dir;       // wkdr 
+    char *work_dir;       // wkdr
 } jobcomp_redis_t;
 
 // Job formatter initialization

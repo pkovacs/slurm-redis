@@ -23,7 +23,7 @@
 #
 
 # SLURM_INCLUDE_DIRS   - where to find slurm.h, etc.
-# SLURM_LIBRARIES      - slurm libraries 
+# SLURM_LIBRARIES      - slurm libraries
 # SLURM_FOUND          - true if slurm found
 
 include(FindPackageHandleStandardArgs)

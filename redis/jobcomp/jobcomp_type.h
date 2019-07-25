@@ -37,7 +37,7 @@
 
 extern RedisModuleType *jobcomp_redis_t;
 
-/* 
+/*
  * The slurm jobcomp plugins each support a slightly different set of job
  * completion fields, so I've chosen the fields below as a starting point.
  */
