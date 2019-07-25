@@ -52,9 +52,9 @@ set(SLURM_REDIS_VERSION_PATCH 0)
 # Set compile flags
 # -----------------
 string(CONCAT LOCAL_C_FLAGS
-    "-std=c11 -Wformat -Wformat-security -Wunused-result "
-    #"-Wall -Wextra -Werror -pedantic")
-    "-Wall -Wextra")
+    "-std=c11 -Wformat -Wformat-security -Wunused-result -Wall -Wextra "
+    #-Werror")
+    "")
 list(APPEND CMAKE_C_FLAGS ${LOCAL_C_FLAGS})
 set(CMAKE_C_FLAGS_DEBUG "-g")
 set(CMAKE_C_FLAGS_RELEASE "-O2")
