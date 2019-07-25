@@ -28,5 +28,4 @@ include_directories(
 )
 
 add_subdirectory(common)
-#add_subdirectory(accounting_storage)
 add_subdirectory(jobcomp)
