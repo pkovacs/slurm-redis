@@ -33,7 +33,7 @@
 #include <time.h>
 #include <src/common/uid.h>
 
-#include "slurm/common/ttl_hash.h"
+#include "src/common/ttl_hash.h"
 
 static ttl_hash_t usnm_cache = NULL;
 static ttl_hash_t grnm_cache = NULL;
