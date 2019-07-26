@@ -27,6 +27,7 @@
 #include "config.h"
 #endif
 
+#include <string.h>
 #include <hiredis.h>
 #include <slurm/slurm.h>
 #include <slurm/spank.h>
@@ -53,6 +54,14 @@ static const char *host = "127.0.0.1";
 static const int port = 6379;
 static redisContext *ctx = NULL;
 static char *keytag = NULL;
+
+// Field labels for all supported redis fields
+static const char *field_label[] = {
+    "JobID", "Partition", "Start", "End", "Elapsed", "UID", "User", "GID",
+    "Group", "NNodes", "NCPUs", "NodeList", "JobName", "State", "TimeLimit",
+    "BlockID", "WorkDir", "Reservation", "ReqGRES", "Account", "QOS", "WCKey",
+    "Cluster", "Submit", "Eligible", "DerivedExitCode", "ExitCode"
+};
 
 /*
  * Shims for the slurm allocators which are macros whose address we cannot
@@ -117,78 +126,52 @@ int slurm_jobcomp_set_location(char *location)
         return SLURM_ERROR;
     }
     if (location) {
-        slurm_debug("%s: location %s", plugin_type, location);
-        keytag = xstrdup_printf("%s:", location);
+        keytag = xstrdup(location);
     } else {
         keytag = xstrdup("");
     }
     return SLURM_SUCCESS;
 }
 
-int slurm_jobcomp_log_record(struct job_record *in)
+int slurm_jobcomp_log_record(struct job_record *job)
 {
-    if (!in) {
+    redisReply *reply;
+    if (!job) {
         return SLURM_SUCCESS;
     }
-    jobcomp_redis_t *out = jobcomp_redis_alloc();
-    int rc = jobcomp_redis_format_job(in, out);
+    redis_fields_t *fields = NULL;
+    int rc = jobcomp_redis_format_fields(job, &fields);
     if (rc != SLURM_SUCCESS) {
-        jobcomp_redis_free(out);
-        return rc;
+        // todo, e.g. we MUST have fields->value[kJobID]
     }
-/*
- * uint32_t job_id;      // jbid
- * uint32_t uid;         // usid
- * uint32_t gid;         // grid
- * uint32_t job_state;   // jbsc
- * uint32_t node_cnt;    // ndct
- * uint32_t proc_cnt;    // prct
- * uint32_t maxprocs;    // prmx
- * uint32_t time_limit;  // tmlm
- * char *job_state_text; // jbst
- * char *start_time;     // sttm
- * char *end_time;       // entm
- * char *submit_time;    // sbtm
- * char *eligible_time;  // eltm
-    char *account;        // acct
-    char *cluster;        // clus
- * char *user_name;      // usnm
- * char *group_name;     // grnm
- * char *job_name;       // jbnm
- * char *partition;      // part
- * char *node_list;      // ndls
-    char *qos_name;       // qsnm
-    char *resv_name;      // rvnm
-    char *req_gres;       // rvgr
-    char *wckey;          // wcky
-    char *derived_ec;     // dxcd
-    char *exit_code;      // excd
-    char *work_dir;       // wkdr
- */
-    // MULTI/EXEC for hash set + indices
-    redisReply *reply;
-    reply = redisCommand(ctx,
-            "HMSET %s%u "
-            "jbid %u usid %u grid %u "
-            "jbsc %u ndct %u prct %u "
-            "prmx %u tmlm %u "
-            "jbst %s "
-            "sttm %s entm %s "
-            "sbtm %s eltm %s "
-            "usnm %s grnm %s jbnm %s "
-            "part %s ndls %s"
-            ,
-            keytag, out->job_id,
-            out->job_id, out->uid, out->gid,
-            out->job_state, out->node_cnt, out->proc_cnt,
-            out->maxprocs, out->time_limit,
-            out->job_state_txt,
-            out->start_time, out->end_time,
-            out->submit_time, out->eligible_time,
-            out->user_name, out->group_name, out->job_name,
-            out->partition, out->node_list);
 
-    freeReplyObject(reply);
+    // Pipeline redis commands
+    int i = 0, val_count = 0;
+    for (; i < MAX_REDIS_FIELDS; ++i) {
+        if (fields->value[i]) {
+            redisAppendCommand(ctx, "HSET %s:%s %s %s",
+                keytag, fields->value[kJobID],
+                field_label[i], fields->value[i]);
+            ++val_count;
+        }
+    }
+
+    // Pop off the pipelined replies
+    for (i = 0; i < val_count; ++i) {
+        redisGetReply(ctx, (void **)&reply);
+        freeReplyObject(reply);
+    }
+
+    // Free mars
+    for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
+        if (fields->value[i]) {
+            xfree(fields->value[i]);
+            fields->value[i] = NULL;
+        }
+    }
+    xfree(fields);
+    fields = NULL;
+
     return SLURM_SUCCESS;
 }
 

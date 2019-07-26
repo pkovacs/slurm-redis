@@ -30,6 +30,7 @@
 #include "jobcomp_redis_formatter.h"
 
 #include <assert.h>
+#include <string.h>
 #include <time.h>
 #include <src/common/uid.h>
 
@@ -89,102 +90,87 @@ void jobcomp_redis_format_fini()
     grnm_cache = NULL;
 }
 
-jobcomp_redis_t *jobcomp_redis_alloc()
+int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields)
 {
-    return (*malloc_fn)(sizeof(jobcomp_redis_t));
-}
+    assert(fields != NULL);
+    *fields = (*malloc_fn)(sizeof(redis_fields_t));
+    memset(*fields, 0, sizeof(redis_fields_t));
 
-void jobcomp_redis_free(jobcomp_redis_t *job)
-{
-    if (!job) {
-        return;
+    char buf[64];
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", job->job_id);
+    (*fields)->value[kJobID] = (*strdup_fn)(buf);
+
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", job->user_id);
+    (*fields)->value[kUID] = (*strdup_fn)(buf);
+
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", job->group_id);
+    (*fields)->value[kGID] = (*strdup_fn)(buf);
+
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", job->node_cnt);
+    (*fields)->value[kNNodes] = (*strdup_fn)(buf);
+
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", job->total_cpus);
+    (*fields)->value[kNCPUs] = (*strdup_fn)(buf);
+
+    if (ttl_hash_get(usnm_cache, job->user_id, &(*fields)->value[kUser])
+        != HASH_OK) {
+        (*fields)->value[kUser] = uid_to_string(job->user_id);
+        ttl_hash_set(usnm_cache, job->user_id, (*fields)->value[kUser]);
     }
-    (*free_fn)(job->job_state_txt);
-    (*free_fn)(job->start_time);
-    (*free_fn)(job->end_time);
-    (*free_fn)(job->submit_time);
-    (*free_fn)(job->eligible_time);
-    (*free_fn)(job->account);
-    (*free_fn)(job->cluster);
-    (*free_fn)(job->user_name);
-    (*free_fn)(job->group_name);
-    (*free_fn)(job->job_name);
-    (*free_fn)(job->partition);
-    (*free_fn)(job->node_list);
-    (*free_fn)(job->qos_name);
-    (*free_fn)(job->resv_name);
-    (*free_fn)(job->req_gres);
-    (*free_fn)(job->wckey);
-    (*free_fn)(job->derived_ec);
-    (*free_fn)(job->exit_code);
-    (*free_fn)(job->work_dir);
-    (*free_fn)(job);
-}
-/*
- * uint32_t job_id;      // jbid
- * uint32_t uid;         // usid
- * uint32_t gid;         // grid
- * uint32_t job_state;   // jbsc
- * uint32_t node_cnt;    // ndct
- * uint32_t proc_cnt;    // prct
- * uint32_t maxprocs;    // prmx
- * uint32_t time_limit;  // tmlm
- * char *job_state_text; // jbst
- * char *start_time;     // sttm
- * char *end_time;       // entm
- * char *submit_time;    // sbtm
- * char *eligible_time;  // eltm
-    char *account;        // acct
-    char *cluster;        // clus
- * char *user_name;      // usnm
- * char *group_name;     // grnm
- * char *job_name;       // jbnm
- * char *partition;      // part
- * char *node_list;      // ndls
-    char *qos_name;       // qsnm
-    char *resv_name;      // rvnm
-    char *req_gres;       // rvgr
-    char *wckey;          // wcky
-    char *derived_ec;     // dxcd
-    char *exit_code;      // excd
-    char *work_dir;       // wkdr
 
- */
-int jobcomp_redis_format_job(const struct job_record *in, jobcomp_redis_t *out)
-{
-    if (!in || !out) {
-        return SLURM_ERROR;
+    if (ttl_hash_get(grnm_cache, job->group_id, &(*fields)->value[kGroup])
+        != HASH_OK) {
+        (*fields)->value[kGroup] = gid_to_string(job->group_id);
+        ttl_hash_set(grnm_cache, job->group_id, (*fields)->value[kGroup]);
     }
-    out->job_id = in->job_id;
-    out->uid = in->user_id;
-    out->gid = in->group_id;
 
+    uint32_t job_state;
     time_t start_time, end_time;
-    if (IS_JOB_RESIZING(in)) {
-        out->job_state = JOB_RESIZING;
-        start_time = in->resize_time ? in->resize_time : in->start_time;
+    if (IS_JOB_RESIZING(job)) {
+        job_state = JOB_RESIZING;
+        start_time = job->resize_time ? job->resize_time : job->start_time;
         end_time = time(NULL);
     } else {
-        out->job_state = in->job_state & JOB_STATE_BASE;
-        if (in->resize_time) {
-            start_time = in->resize_time;
-        } else if (in->start_time > in->end_time) {
+        job_state = job->job_state & JOB_STATE_BASE;
+        if (job->resize_time) {
+            start_time = job->resize_time;
+        } else if (job->start_time > job->end_time) {
             start_time = (time_t)0;
         } else {
-            start_time = in->start_time;
+            start_time = job->start_time;
         }
-        end_time = in->end_time;
+        end_time = job->end_time;
     }
-    format_iso8601(start_time, &out->start_time);
-    format_iso8601(end_time, &out->end_time);
+    (*fields)->value[kState] = (*strdup_fn)(job_state_string(job_state));
+    format_iso8601(start_time, &(*fields)->value[kStart]);
+    format_iso8601(end_time, &(*fields)->value[kEnd]);
 
-    if (in->details) {
-        format_iso8601(in->details->submit_time, &out->submit_time);
-        format_iso8601(in->details->begin_time, &out->eligible_time);
+    if (job->details) {
+        format_iso8601(job->details->submit_time, &(*fields)->value[kSubmit]);
+        format_iso8601(job->details->begin_time, &(*fields)->value[kEligible]);
     }
 
-    out->node_cnt = in->node_cnt;
-    out->proc_cnt = in->total_cpus;
+    (*fields)->value[kPartition] = (*strdup_fn)(job->partition);
+    (*fields)->value[kNodeList] = (*strdup_fn)(job->nodes);
+
+    if (job->name && *job->name) {
+        (*fields)->value[kJobName] = job->name;
+    } else {
+        (*fields)->value[kJobName] = (*strdup_fn)("allocation");
+    }
+
+    return SLURM_SUCCESS;
+}
+
+#if 0
+int jobcomp_redis_format_job(const struct job_record *in, jobcomp_redis_t *out)
+{
+
     out->maxprocs = in->details ? in->details->max_cpus : NO_VAL;
 
     if ((in->time_limit == NO_VAL) && in->part_ptr) {
@@ -193,26 +179,6 @@ int jobcomp_redis_format_job(const struct job_record *in, jobcomp_redis_t *out)
         out->time_limit = in->time_limit;
     }
 
-    out->job_state_txt = (*strdup_fn)(job_state_string(out->job_state));
-
-    if (ttl_hash_get(usnm_cache, out->uid, &out->user_name) != HASH_OK) {
-        out->user_name = uid_to_string(out->uid);
-        ttl_hash_set(usnm_cache, out->uid, out->user_name);
-    }
-
-    if (ttl_hash_get(grnm_cache, out->gid, &out->group_name) != HASH_OK) {
-        out->group_name = gid_to_string(out->gid);
-        ttl_hash_set(grnm_cache, out->gid, out->group_name);
-    }
-
-    if (in->name && *in->name) {
-        out->job_name = slurm_add_slash_to_quotes(in->name);
-    } else {
-        out->job_name = (*strdup_fn)("allocation");
-    }
-
-    out->partition = (*strdup_fn)(in->partition);
-    out->node_list = (*strdup_fn)(in->nodes);
-
     return SLURM_SUCCESS;
 }
+#endif
