@@ -159,7 +159,7 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
     (*fields)->value[kNodeList] = (*strdup_fn)(job->nodes);
 
     if (job->name && *job->name) {
-        (*fields)->value[kJobName] = job->name;
+        (*fields)->value[kJobName] = (*strdup_fn)(job->name);
     } else {
         (*fields)->value[kJobName] = (*strdup_fn)("allocation");
     }
