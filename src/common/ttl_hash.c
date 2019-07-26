@@ -35,6 +35,9 @@
 #include <string.h>
 #include <time.h>
 
+#include <src/common/xmalloc.h>
+#include <src/common/xstring.h>
+
 #define TTL_HASH_VALUE_SZ 32
 
 typedef struct ttl_hash_bucket {
@@ -46,9 +49,6 @@ typedef struct ttl_hash_bucket {
 typedef struct ttl_hash {
     size_t sz;
     size_t ttl;
-    void *(*malloc_fn)(size_t);
-    void (*free_fn)(void *);
-    char *(*strdup_fn)(const char *);
     ttl_hash_bucket_t buckets;
     pthread_rwlockattr_t rwlock_attr;
     pthread_rwlock_t rwlock;
@@ -64,13 +64,10 @@ static size_t hasher(size_t x) {
 ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
 {
     assert(init != NULL);
-    ttl_hash_t hash = (*init->malloc_fn)(sizeof(struct ttl_hash));
-    hash->buckets = (*init->malloc_fn)(init->sz * sizeof(struct ttl_hash_bucket));
+    ttl_hash_t hash = xmalloc(sizeof(struct ttl_hash));
+    hash->buckets = xmalloc(init->sz * sizeof(struct ttl_hash_bucket));
     hash->sz = init->sz;
     hash->ttl = init->ttl;
-    hash->malloc_fn = init->malloc_fn;
-    hash->free_fn = init->free_fn;
-    hash->strdup_fn = init->strdup_fn;
     pthread_rwlockattr_init(&hash->rwlock_attr);
     pthread_rwlockattr_setkind_np(&hash->rwlock_attr,
         PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
@@ -82,9 +79,8 @@ void destroy_ttl_hash(ttl_hash_t hash)
 {
     pthread_rwlock_destroy(&hash->rwlock);
     pthread_rwlockattr_destroy(&hash->rwlock_attr);
-    void (*free_fn)() = hash->free_fn;
-    (*free_fn)(hash->buckets);
-    (*free_fn)(hash);
+    xfree(hash->buckets);
+    xfree(hash);
 }
 
 int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
@@ -104,7 +100,7 @@ int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
         goto final;
     }
     if (value) {
-        *value = (*hash->strdup_fn)(hash->buckets[bkt].value);
+        *value = xstrdup(hash->buckets[bkt].value);
     }
 final:
     pthread_rwlock_unlock(&hash->rwlock);

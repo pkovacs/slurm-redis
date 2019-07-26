@@ -33,14 +33,13 @@
 #include <string.h>
 #include <time.h>
 #include <src/common/uid.h>
+#include <src/common/xmalloc.h>
+#include <src/common/xstring.h>
 
 #include "src/common/ttl_hash.h"
 
 static ttl_hash_t usnm_cache = NULL;
 static ttl_hash_t grnm_cache = NULL;
-static void *(*malloc_fn)(size_t) = NULL;
-static void (*free_fn)(void *) = NULL;
-static char *(*strdup_fn)(const char *) = NULL;
 
 void format_iso8601(time_t t, char **out)
 {
@@ -48,12 +47,12 @@ void format_iso8601(time_t t, char **out)
         return;
     }
     if (t <= (time_t)0) {
-        *out = (*strdup_fn)("Unknown");
+        *out = xstrdup("Unknown");
     }
     const size_t iso8601_sz = 20;
     struct tm stm;
     gmtime_r(&t, &stm);
-    *out = (*malloc_fn)(iso8601_sz);
+    *out = xmalloc(iso8601_sz);
     memset(*out, 0, iso8601_sz);
     strftime(*out, iso8601_sz, "%FT%T", &stm);
 }
@@ -63,23 +62,14 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
     assert(init != NULL);
     ttl_hash_init_t usnm_cache_init = {
         .sz = init->usnm_cache_sz,
-        .ttl = init->usnm_cache_ttl,
-        .malloc_fn = init->malloc_fn,
-        .free_fn = init->free_fn,
-        .strdup_fn = init->strdup_fn
+        .ttl = init->usnm_cache_ttl
     };
     ttl_hash_init_t grnm_cache_init = {
         .sz = init->grnm_cache_sz,
-        .ttl = init->grnm_cache_ttl,
-        .malloc_fn = init->malloc_fn,
-        .free_fn = init->free_fn,
-        .strdup_fn = init->strdup_fn
+        .ttl = init->grnm_cache_ttl
     };
     usnm_cache = create_ttl_hash(&usnm_cache_init);
     grnm_cache = create_ttl_hash(&grnm_cache_init);
-    malloc_fn = init->malloc_fn;
-    free_fn = init->free_fn;
-    strdup_fn = init->strdup_fn;
 }
 
 void jobcomp_redis_format_fini()
@@ -93,29 +83,29 @@ void jobcomp_redis_format_fini()
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields)
 {
     assert(fields != NULL);
-    *fields = (*malloc_fn)(sizeof(redis_fields_t));
+    *fields = xmalloc(sizeof(redis_fields_t));
     memset(*fields, 0, sizeof(redis_fields_t));
 
     char buf[64];
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->job_id);
-    (*fields)->value[kJobID] = (*strdup_fn)(buf);
+    (*fields)->value[kJobID] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->user_id);
-    (*fields)->value[kUID] = (*strdup_fn)(buf);
+    (*fields)->value[kUID] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->group_id);
-    (*fields)->value[kGID] = (*strdup_fn)(buf);
+    (*fields)->value[kGID] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->node_cnt);
-    (*fields)->value[kNNodes] = (*strdup_fn)(buf);
+    (*fields)->value[kNNodes] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->total_cpus);
-    (*fields)->value[kNCPUs] = (*strdup_fn)(buf);
+    (*fields)->value[kNCPUs] = xstrdup(buf);
 
     if (ttl_hash_get(usnm_cache, job->user_id, &(*fields)->value[kUser])
         != HASH_OK) {
@@ -146,7 +136,7 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         }
         end_time = job->end_time;
     }
-    (*fields)->value[kState] = (*strdup_fn)(job_state_string(job_state));
+    (*fields)->value[kState] = xstrdup(job_state_string(job_state));
     format_iso8601(start_time, &(*fields)->value[kStart]);
     format_iso8601(end_time, &(*fields)->value[kEnd]);
 
@@ -155,13 +145,13 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         format_iso8601(job->details->begin_time, &(*fields)->value[kEligible]);
     }
 
-    (*fields)->value[kPartition] = (*strdup_fn)(job->partition);
-    (*fields)->value[kNodeList] = (*strdup_fn)(job->nodes);
+    (*fields)->value[kPartition] = xstrdup(job->partition);
+    (*fields)->value[kNodeList] = xstrdup(job->nodes);
 
     if (job->name && *job->name) {
-        (*fields)->value[kJobName] = (*strdup_fn)(job->name);
+        (*fields)->value[kJobName] = xstrdup(job->name);
     } else {
-        (*fields)->value[kJobName] = (*strdup_fn)("allocation");
+        (*fields)->value[kJobName] = xstrdup("allocation");
     }
 
     return SLURM_SUCCESS;

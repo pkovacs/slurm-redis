@@ -63,22 +63,6 @@ static const char *field_label[] = {
     "Cluster", "Submit", "Eligible", "DerivedExitCode", "ExitCode"
 };
 
-/*
- * Shims for the slurm allocators which are macros whose address we cannot
- * take directly.
- */
-static void *malloc_shim(size_t sz) {
-    return xmalloc(sz);
-}
-
-static void free_shim(void *mem) {
-    xfree(mem);
-}
-
-static char *strdup_shim(const char *s) {
-    return xstrdup(s);
-}
-
 int init(void)
 {
     static int once = 0;
@@ -92,10 +76,7 @@ int init(void)
         .usnm_cache_sz = USNM_CACHE_SZ,
         .usnm_cache_ttl = USNM_CACHE_TTL,
         .grnm_cache_sz = GRNM_CACHE_SZ,
-        .grnm_cache_ttl = GRNM_CACHE_TTL,
-        .malloc_fn = malloc_shim,
-        .free_fn = free_shim,
-        .strdup_fn = strdup_shim
+        .grnm_cache_ttl = GRNM_CACHE_TTL
     };
     jobcomp_redis_format_init(&format_init);
     return SLURM_SUCCESS;
@@ -180,20 +161,17 @@ int slurm_jobcomp_get_errno(void)
     return SLURM_SUCCESS;
 }
 
-char *slurm_jobcomp_strerror(int errnum)
+char *slurm_jobcomp_strerror(__attribute__ ((unused)) int errnum)
 {
-    if (errnum) {}
     return NULL;
 }
 
-List slurm_jobcomp_get_jobs(void *job_cond)
+List slurm_jobcomp_get_jobs(__attribute__ ((unused)) void *job_cond)
 {
-    if (job_cond) {}
     return NULL;
 }
 
-int slurm_jobcomp_archive(void *arch_cond)
+int slurm_jobcomp_archive(__attribute__ ((unused)) void *arch_cond)
 {
-    if (arch_cond) {}
     return SLURM_SUCCESS;
 }

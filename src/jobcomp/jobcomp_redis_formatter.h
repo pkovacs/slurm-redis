@@ -99,12 +99,6 @@ typedef struct jobcomp_redis_format_init {
     size_t grnm_cache_sz;
     // Time-to-live of gid->group_name cache entries
     size_t grnm_cache_ttl;
-    // malloc function
-    void *(*malloc_fn)(size_t);
-    // free function
-    void (*free_fn)(void *);
-    // strdup function
-    char *(*strdup_fn)(const char *);
 } jobcomp_redis_format_init_t;
 
 // Initialize the formatter

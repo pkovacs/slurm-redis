@@ -48,12 +48,6 @@ typedef struct {
     size_t sz;
     // Time-to-live in seconds of hash entries
     size_t ttl;
-    // malloc function
-    void *(*malloc_fn)(size_t);
-    // free function
-    void (*free_fn)(void *);
-    // strdup function
-    char *(*strdup_fn)(const char *);
 } ttl_hash_init_t;
 
 // Create a ttl hash
