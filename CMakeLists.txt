@@ -52,13 +52,14 @@ set(SLURM_REDIS_VERSION_PATCH 0)
 # Set compile flags
 # -----------------
 string(CONCAT LOCAL_C_FLAGS
-    "-std=c11 -Wformat -Wformat-security -Wunused-result -Wall -Wextra "
+    "-Wformat -Wformat-security -fstack-protector-strong "
+    "-Wunused-result -Wall -Wextra "
     #-Werror")
-    "")
+    "-Werror=format-security")
 list(APPEND CMAKE_C_FLAGS ${LOCAL_C_FLAGS})
 set(CMAKE_C_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_RELEASE "-O2")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
+set(CMAKE_C_FLAGS_RELEASE "-O2 -Wp,-D_FORTIFY_SOURCE=2")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -Wp,-D_FORTIFY_SOURCE=2")
 set(CMAKE_C_FLAGS_MINSIZEREL "-Os")
 
 if(NOT CMAKE_BUILD_TYPE)
