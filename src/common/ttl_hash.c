@@ -47,8 +47,8 @@ typedef struct ttl_hash_bucket {
 } *ttl_hash_bucket_t;
 
 typedef struct ttl_hash {
-    size_t sz;
-    size_t ttl;
+    size_t hash_sz;
+    size_t hash_ttl;
     ttl_hash_bucket_t buckets;
     pthread_rwlockattr_t rwlock_attr;
     pthread_rwlock_t rwlock;
@@ -65,9 +65,9 @@ ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
 {
     assert(init != NULL);
     ttl_hash_t hash = xmalloc(sizeof(struct ttl_hash));
-    hash->buckets = xmalloc(init->sz * sizeof(struct ttl_hash_bucket));
-    hash->sz = init->sz;
-    hash->ttl = init->ttl;
+    hash->buckets = xmalloc(init->hash_sz * sizeof(struct ttl_hash_bucket));
+    hash->hash_sz = init->hash_sz;
+    hash->hash_ttl = init->hash_ttl;
     pthread_rwlockattr_init(&hash->rwlock_attr);
     pthread_rwlockattr_setkind_np(&hash->rwlock_attr,
         PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
@@ -90,12 +90,12 @@ int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
         rc = HASH_BUSY;
         goto final;
     }
-    size_t bkt = hasher(key) % hash->sz;
+    size_t bkt = hasher(key) % hash->hash_sz;
     if (hash->buckets[bkt].key != key) {
         rc = HASH_NOT_FOUND;
         goto final;
     }
-    if ((hash->buckets[bkt].ttl + hash->ttl) < (size_t)time(NULL)) {
+    if ((hash->buckets[bkt].ttl + hash->hash_ttl) < (size_t)time(NULL)) {
         rc = HASH_EXPIRED;
         goto final;
     }
@@ -114,14 +114,15 @@ int ttl_hash_set(ttl_hash_t hash, size_t key, const char *value)
         rc = HASH_BUSY;
         goto final;
     }
-    size_t bkt = hasher(key) % hash->sz;
+    size_t bkt = hasher(key) % hash->hash_sz;
     hash->buckets[bkt].key = key;
     memset(hash->buckets[bkt].value, 0, sizeof(hash->buckets[bkt].value));
     if (value) {
         // bucket string is always zero-terminated
-        strncpy(hash->buckets[bkt].value, value, sizeof(hash->buckets[bkt].value)-1);
+        strncpy(hash->buckets[bkt].value, value,
+                sizeof(hash->buckets[bkt].value)-1);
     }
-    hash->buckets[bkt].ttl = hash->ttl + (size_t)time(NULL);
+    hash->buckets[bkt].ttl = hash->hash_ttl + (size_t)time(NULL);
 final:
     pthread_rwlock_unlock(&hash->rwlock);
     return rc;

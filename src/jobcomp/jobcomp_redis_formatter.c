@@ -38,8 +38,8 @@
 
 #include "src/common/ttl_hash.h"
 
-static ttl_hash_t usnm_cache = NULL;
-static ttl_hash_t grnm_cache = NULL;
+static ttl_hash_t user_cache = NULL;
+static ttl_hash_t group_cache = NULL;
 
 void format_iso8601(time_t t, char **out)
 {
@@ -60,24 +60,24 @@ void format_iso8601(time_t t, char **out)
 void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
 {
     assert(init != NULL);
-    ttl_hash_init_t usnm_cache_init = {
-        .sz = init->usnm_cache_sz,
-        .ttl = init->usnm_cache_ttl
+    ttl_hash_init_t user_cache_init = {
+        .hash_sz = init->user_cache_sz,
+        .hash_ttl = init->user_cache_ttl
     };
-    ttl_hash_init_t grnm_cache_init = {
-        .sz = init->grnm_cache_sz,
-        .ttl = init->grnm_cache_ttl
+    ttl_hash_init_t group_cache_init = {
+        .hash_sz = init->group_cache_sz,
+        .hash_ttl = init->group_cache_ttl
     };
-    usnm_cache = create_ttl_hash(&usnm_cache_init);
-    grnm_cache = create_ttl_hash(&grnm_cache_init);
+    user_cache = create_ttl_hash(&user_cache_init);
+    group_cache = create_ttl_hash(&group_cache_init);
 }
 
 void jobcomp_redis_format_fini()
 {
-    destroy_ttl_hash(usnm_cache);
-    usnm_cache = NULL;
-    destroy_ttl_hash(grnm_cache);
-    grnm_cache = NULL;
+    destroy_ttl_hash(user_cache);
+    user_cache = NULL;
+    destroy_ttl_hash(group_cache);
+    group_cache = NULL;
 }
 
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields)
@@ -107,16 +107,16 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
     snprintf(buf, sizeof(buf)-1, "%u", job->total_cpus);
     (*fields)->value[kNCPUs] = xstrdup(buf);
 
-    if (ttl_hash_get(usnm_cache, job->user_id, &(*fields)->value[kUser])
+    if (ttl_hash_get(user_cache, job->user_id, &(*fields)->value[kUser])
         != HASH_OK) {
         (*fields)->value[kUser] = uid_to_string(job->user_id);
-        ttl_hash_set(usnm_cache, job->user_id, (*fields)->value[kUser]);
+        ttl_hash_set(user_cache, job->user_id, (*fields)->value[kUser]);
     }
 
-    if (ttl_hash_get(grnm_cache, job->group_id, &(*fields)->value[kGroup])
+    if (ttl_hash_get(group_cache, job->group_id, &(*fields)->value[kGroup])
         != HASH_OK) {
         (*fields)->value[kGroup] = gid_to_string(job->group_id);
-        ttl_hash_set(grnm_cache, job->group_id, (*fields)->value[kGroup]);
+        ttl_hash_set(group_cache, job->group_id, (*fields)->value[kGroup]);
     }
 
     uint32_t job_state;

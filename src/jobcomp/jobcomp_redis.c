@@ -37,10 +37,10 @@
 
 #include "jobcomp_redis_formatter.h"
 
-#define USNM_CACHE_SZ 64
-#define GRNM_CACHE_SZ 64
-#define USNM_CACHE_TTL 120
-#define GRNM_CACHE_TTL 120
+#define USER_CACHE_SZ 64
+#define GROUP_CACHE_SZ 64
+#define USER_CACHE_TTL 120
+#define GROUP_CACHE_TTL 120
 
 const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
@@ -73,10 +73,10 @@ int init(void)
         slurm_debug("%s loaded", plugin_name);
     }
     jobcomp_redis_format_init_t format_init = {
-        .usnm_cache_sz = USNM_CACHE_SZ,
-        .usnm_cache_ttl = USNM_CACHE_TTL,
-        .grnm_cache_sz = GRNM_CACHE_SZ,
-        .grnm_cache_ttl = GRNM_CACHE_TTL
+        .user_cache_sz = USER_CACHE_SZ,
+        .user_cache_ttl = USER_CACHE_TTL,
+        .group_cache_sz = GROUP_CACHE_SZ,
+        .group_cache_ttl = GROUP_CACHE_TTL
     };
     jobcomp_redis_format_init(&format_init);
     return SLURM_SUCCESS;

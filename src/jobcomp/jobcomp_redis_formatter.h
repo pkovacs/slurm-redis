@@ -92,13 +92,13 @@ typedef struct redis_fields {
 // Job formatter initialization
 typedef struct jobcomp_redis_format_init {
     // Number of uid->user_name cache entries
-    size_t usnm_cache_sz;
+    size_t user_cache_sz;
     // Time-to-live of uid->user_name cache entries
-    size_t usnm_cache_ttl;
+    size_t user_cache_ttl;
     // Number of gid->group_name cache entries
-    size_t grnm_cache_sz;
+    size_t group_cache_sz;
     // Time-to-live of gid->group_name cache entries
-    size_t grnm_cache_ttl;
+    size_t group_cache_ttl;
 } jobcomp_redis_format_init_t;
 
 // Initialize the formatter

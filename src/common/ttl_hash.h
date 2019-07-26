@@ -45,9 +45,9 @@ typedef struct ttl_hash *ttl_hash_t;
 // Hash initialization
 typedef struct {
     // Number of hash entries
-    size_t sz;
+    size_t hash_sz;
     // Time-to-live in seconds of hash entries
-    size_t ttl;
+    size_t hash_ttl;
 } ttl_hash_init_t;
 
 // Create a ttl hash
