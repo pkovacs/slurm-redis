@@ -35,5 +35,6 @@
 #cmakedefine HAVE_TIME_H
 
 #cmakedefine HAVE_ATTRIBUTE_CLEANUP
+#cmakedefine HAVE_ATTRIBUTE_UNUSED
 
 #endif /* CONFIG_H */

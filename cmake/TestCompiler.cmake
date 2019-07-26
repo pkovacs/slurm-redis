@@ -35,3 +35,15 @@ check_c_source_compiles("
    }
 "  HAVE_ATTRIBUTE_CLEANUP
 )
+
+check_c_source_compiles("
+   int main(__attribute__ ((unused)) int argc,
+            __attribute__ ((unused)) char **argv)
+   {
+     return 0;
+   }
+"  HAVE_ATTRIBUTE_UNUSED
+)
+if(NOT HAVE_ATTRIBUTE_UNUSED)
+    message(FATAL_ERROR "compiler __attribute__ ((unused)) not found")
+endif()
