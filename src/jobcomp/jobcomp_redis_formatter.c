@@ -140,10 +140,9 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
     format_iso8601(start_time, &(*fields)->value[kStart]);
     format_iso8601(end_time, &(*fields)->value[kEnd]);
 
-    if (job->details) {
-        format_iso8601(job->details->submit_time, &(*fields)->value[kSubmit]);
-        format_iso8601(job->details->begin_time, &(*fields)->value[kEligible]);
-    }
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%ld", end_time - start_time);
+    (*fields)->value[kElapsed] = xstrdup(buf);
 
     (*fields)->value[kPartition] = xstrdup(job->partition);
     (*fields)->value[kNodeList] = xstrdup(job->nodes);
@@ -154,21 +153,77 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         (*fields)->value[kJobName] = xstrdup("allocation");
     }
 
-    return SLURM_SUCCESS;
-}
-
-#if 0
-int jobcomp_redis_format_job(const struct job_record *in, jobcomp_redis_t *out)
-{
-
-    out->maxprocs = in->details ? in->details->max_cpus : NO_VAL;
-
-    if ((in->time_limit == NO_VAL) && in->part_ptr) {
-        out->time_limit = in->part_ptr->max_time;
+    if (job->time_limit == INFINITE) {
+        (*fields)->value[kTimeLimit] = xstrdup("UNLIMITED");
+    } else if (job->time_limit == NO_VAL) {
+        (*fields)->value[kTimeLimit] = xstrdup("Partition_Limit");
     } else {
-        out->time_limit = in->time_limit;
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf)-1, "%u", job->time_limit);
+        (*fields)->value[kUID] = xstrdup(buf);
+    }
+
+    int ec1 = 0, ec2 = 0;
+    if (job->derived_ec == NO_VAL) {
+    } else if (WIFSIGNALED(job->derived_ec)) {
+        ec2 = WTERMSIG(job->derived_ec);
+    } else if (WIFEXITED(job->derived_ec)) {
+        ec1 = WEXITSTATUS(job->derived_ec);
+    }
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
+    (*fields)->value[kDerivedExitCode] = xstrdup(buf);
+
+    ec1 = ec2 = 0;
+    if (job->exit_code == NO_VAL) {
+    } else if (WIFSIGNALED(job->exit_code)) {
+        ec2 = WTERMSIG(job->exit_code);
+    } else if (WIFEXITED(job->exit_code)) {
+        ec1 = WEXITSTATUS(job->exit_code);
+    }
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
+    (*fields)->value[kExitCode] = xstrdup(buf);
+
+    // Below are data for which the absence of a value on the job record
+    // means we store no hash value in redis at all, thus saving memory.
+
+    if (job->details) {
+        if (job->details->submit_time) {
+            format_iso8601(job->details->submit_time, &(*fields)->value[kSubmit]);
+        }
+        if (job->details->begin_time) {
+            format_iso8601(job->details->begin_time, &(*fields)->value[kEligible]);
+        }
+        if (job->details->work_dir && *job->details->work_dir) {
+            (*fields)->value[kWorkDir] = xstrdup(job->details->work_dir);
+        }
+    }
+
+    if (job->resv_name && *job->resv_name) {
+        (*fields)->value[kReservation] = strdup(job->resv_name);
+    }
+
+    if (job->gres_req && *job->gres_req) {
+        (*fields)->value[kReqGRES] = strdup(job->gres_req);
+    }
+
+    if (job->account && *job->account) {
+        (*fields)->value[kAccount] = strdup(job->account);
+    }
+
+    if (job->qos_ptr && job->qos_ptr->name && *job->qos_ptr->name) {
+        (*fields)->value[kQOS] = strdup(job->qos_ptr->name);
+    }
+
+    if (job->wckey && *job->wckey) {
+        (*fields)->value[kWCKey] = strdup(job->wckey);
+    }
+
+    if (job->assoc_ptr && job->assoc_ptr->cluster
+        && *job->assoc_ptr->cluster) {
+        (*fields)->value[kCluster] = strdup(job->assoc_ptr->cluster);
     }
 
     return SLURM_SUCCESS;
 }
-#endif

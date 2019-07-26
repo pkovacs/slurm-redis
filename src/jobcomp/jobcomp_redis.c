@@ -116,10 +116,10 @@ int slurm_jobcomp_set_location(char *location)
 
 int slurm_jobcomp_log_record(struct job_record *job)
 {
-    redisReply *reply;
     if (!job) {
         return SLURM_SUCCESS;
     }
+    redisReply *reply;
     redis_fields_t *fields = NULL;
     int rc = jobcomp_redis_format_fields(job, &fields);
     if (rc != SLURM_SUCCESS) {
@@ -141,9 +141,10 @@ int slurm_jobcomp_log_record(struct job_record *job)
     for (i = 0; i < val_count; ++i) {
         redisGetReply(ctx, (void **)&reply);
         freeReplyObject(reply);
+        reply = NULL;
     }
 
-    // Free mars
+    // Free Mars
     for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
             xfree(fields->value[i]);

@@ -40,7 +40,7 @@ typedef struct {
  *  char *partition;      // Partition  +
  *  char *start_time;     // Start      +
  *  char *end_time;       // End        +
-    time_t elapsed_time;  // Elapsed    +
+ *  time_t elapsed_time;  // Elapsed    +
  *  uint32_t uid;         // UID        +
  *  char *uid_name;       // User       +
  *  uint32_t gid;         // GID        +
@@ -50,7 +50,7 @@ typedef struct {
  *  char *nodelist;       // NodeList   +
  *  char *jobname;        // JobName    +
  *  char *state;          // State      +
-    char *timelimit;      // TimeLimit  +
+ *  char *timelimit;      // TimeLimit  +
     char *blockid;        // BlockID    +
     char *connection;     // ?? unused by sacct
     char *reboot;         // ?? unused by sacct
@@ -58,17 +58,17 @@ typedef struct {
     uint32_t max_procs;   // ?? unused by sacct
     char *geo;            // ?? unused by sacct
     char *bg_start_point; // ?? unused by sacct
-    char *work_dir;       // WorkDir    +
-    char *resv_name;      // Reservation+
-    char *req_gres;       // ReqGRES    +
-    char *account;        // Account    +
-    char *qos_name;       // QOS        +
-    char *wckey;          // WCKey      +
-    char *cluster;        // Cluster    +
+ *  char *work_dir;       // WorkDir    +
+ *  char *resv_name;      // Reservation+
+ *  char *req_gres;       // ReqGRES    +
+ *  char *account;        // Account    +
+ *  char *qos_name;       // QOS        +
+ *  char *wckey;          // WCKey      +
+ *  char *cluster;        // Cluster    +
  *  char *submit_time;    // Submit     // sacct uses job_comp->start_time (bug)
  *  char *eligible_time;  // Eligible   +
-    char *derived_ec;     // DerivedExitCode +
-    char *exit_code;      // ExitCode   +
+ *  char *derived_ec;     // DerivedExitCode +
+ *  char *exit_code;      // ExitCode   +
 } jobcomp_job_rec_t;
  */
 
