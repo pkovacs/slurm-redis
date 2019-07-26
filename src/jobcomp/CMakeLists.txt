@@ -24,8 +24,8 @@
 
 add_library(jobcomp_redis MODULE
     jobcomp_redis.c
-    jobcomp_redis_formatter.c
-    jobcomp_redis_formatter.h
+    jobcomp_redis_format.c
+    jobcomp_redis_format.h
 )
 
 set_target_properties(jobcomp_redis

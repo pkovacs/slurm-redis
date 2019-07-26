@@ -27,7 +27,7 @@
 #include "config.h"
 #endif
 
-#include "jobcomp_redis_formatter.h"
+#include "jobcomp_redis_format.h"
 
 #include <assert.h>
 #include <string.h>

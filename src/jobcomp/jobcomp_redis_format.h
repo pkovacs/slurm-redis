@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef JOBCOMP_REDIS_FORMATTER_H
-#define JOBCOMP_REDIS_FORMATTER_H
+#ifndef JOBCOMP_REDIS_FORMAT_H
+#define JOBCOMP_REDIS_FORMAT_H
 
 #include <stdint.h>
 #include <time.h>
@@ -110,4 +110,4 @@ void jobcomp_redis_format_fini();
 // Format an array of redis fields from a struct job_record
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields);
 
-#endif /* JOBCOMP_REDIS_FORMATTER_H */
+#endif /* JOBCOMP_REDIS_FORMAT_H */

@@ -35,7 +35,7 @@
 #include <src/common/xstring.h>
 #include <src/slurmctld/slurmctld.h>
 
-#include "jobcomp_redis_formatter.h"
+#include "jobcomp_redis_format.h"
 
 #define USER_CACHE_SZ 64
 #define GROUP_CACHE_SZ 64
