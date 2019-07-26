@@ -63,6 +63,35 @@ static const char *field_label[] = {
     "Cluster", "Submit", "Eligible", "DerivedExitCode", "ExitCode"
 };
 
+static int redis_connect(void)
+{
+    if (ctx) {
+        redisFree(ctx);
+        ctx = NULL;
+    }
+    ctx = redisConnect(host, port);
+    if (!ctx || ctx->err) {
+        slurm_error("Connection error: %s\n", ctx->errstr);
+        return SLURM_ERROR;
+    }
+    return SLURM_SUCCESS;
+}
+
+static int redis_connected(void)
+{
+    int rc = 0;
+    if (!ctx) {
+        return rc;
+    }
+    redisReply *reply;
+    reply = redisCommand(ctx, "PING");
+    if (ctx->err == 0) {
+        freeReplyObject(reply);
+        rc = 1;
+    }
+    return rc;
+}
+
 int init(void)
 {
     static int once = 0;
@@ -84,7 +113,7 @@ int init(void)
 
 int fini(void)
 {
-    if (ctx != NULL) {
+    if (ctx) {
         slurm_debug("%s finished", plugin_name);
         redisFree(ctx);
         ctx = NULL;
@@ -99,18 +128,20 @@ int fini(void)
 
 int slurm_jobcomp_set_location(char *location)
 {
-    // The location is an optional tag that will be prepended to all redis keys
-    // This can help segregate slurm keys from other keys in redis
-    ctx = redisConnect(host, port);
-    if (ctx == NULL || ctx->err) {
-        slurm_error("Connection error: %s\n", ctx->errstr);
+    if (redis_connected()) {
+        return SLURM_SUCCESS;
+    }
+
+    if (redis_connect() != SLURM_SUCCESS) {
         return SLURM_ERROR;
     }
+
     if (location) {
         keytag = xstrdup(location);
     } else {
         keytag = xstrdup("");
     }
+
     return SLURM_SUCCESS;
 }
 
@@ -119,6 +150,11 @@ int slurm_jobcomp_log_record(struct job_record *job)
     if (!job) {
         return SLURM_SUCCESS;
     }
+
+    if (!redis_connected()) {
+        redis_connect();
+    }
+
     redisReply *reply;
     redis_fields_t *fields = NULL;
     int rc = jobcomp_redis_format_fields(job, &fields);
@@ -157,17 +193,20 @@ int slurm_jobcomp_log_record(struct job_record *job)
     return SLURM_SUCCESS;
 }
 
+List slurm_jobcomp_get_jobs(__attribute__ ((unused)) void *job_cond)
+{
+    if (!redis_connected()) {
+        redis_connect();
+    }
+    return NULL;
+}
+
 int slurm_jobcomp_get_errno(void)
 {
     return SLURM_SUCCESS;
 }
 
 char *slurm_jobcomp_strerror(__attribute__ ((unused)) int errnum)
-{
-    return NULL;
-}
-
-List slurm_jobcomp_get_jobs(__attribute__ ((unused)) void *job_cond)
 {
     return NULL;
 }
