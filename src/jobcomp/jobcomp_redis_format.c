@@ -82,6 +82,7 @@ void jobcomp_redis_format_fini()
 
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields)
 {
+    assert(job != NULL);
     assert(fields != NULL);
     *fields = xmalloc(sizeof(redis_fields_t));
     memset(*fields, 0, sizeof(redis_fields_t));
@@ -163,30 +164,9 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         (*fields)->value[kUID] = xstrdup(buf);
     }
 
-    int ec1 = 0, ec2 = 0;
-    if (job->derived_ec == NO_VAL) {
-    } else if (WIFSIGNALED(job->derived_ec)) {
-        ec2 = WTERMSIG(job->derived_ec);
-    } else if (WIFEXITED(job->derived_ec)) {
-        ec1 = WEXITSTATUS(job->derived_ec);
-    }
-    memset(buf, 0, sizeof(buf));
-    snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
-    (*fields)->value[kDerivedExitCode] = xstrdup(buf);
-
-    ec1 = ec2 = 0;
-    if (job->exit_code == NO_VAL) {
-    } else if (WIFSIGNALED(job->exit_code)) {
-        ec2 = WTERMSIG(job->exit_code);
-    } else if (WIFEXITED(job->exit_code)) {
-        ec1 = WEXITSTATUS(job->exit_code);
-    }
-    memset(buf, 0, sizeof(buf));
-    snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
-    (*fields)->value[kExitCode] = xstrdup(buf);
-
-    // Below are data for which the absence of a value on the job record
-    // means we store no hash value in redis at all, thus saving memory.
+    // Below and all the way to the bottom are data for which the absence
+    // of a value on the job record means we store no hash value in redis
+    // at all, thus saving memory.
 
     if (job->details) {
         if (job->details->submit_time) {
@@ -225,5 +205,38 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         (*fields)->value[kCluster] = strdup(job->assoc_ptr->cluster);
     }
 
+    int ec1 = 0, ec2 = 0;
+    if (job->derived_ec == NO_VAL) {
+    } else if (WIFSIGNALED(job->derived_ec)) {
+        ec2 = WTERMSIG(job->derived_ec);
+    } else if (WIFEXITED(job->derived_ec)) {
+        ec1 = WEXITSTATUS(job->derived_ec);
+    }
+    if (ec1 || ec2) {
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
+        (*fields)->value[kDerivedExitCode] = xstrdup(buf);
+    }
+
+    ec1 = ec2 = 0;
+    if (job->exit_code == NO_VAL) {
+    } else if (WIFSIGNALED(job->exit_code)) {
+        ec2 = WTERMSIG(job->exit_code);
+    } else if (WIFEXITED(job->exit_code)) {
+        ec1 = WEXITSTATUS(job->exit_code);
+    }
+    if (ec1 || ec2) {
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
+        (*fields)->value[kExitCode] = xstrdup(buf);
+    }
+
+    return SLURM_SUCCESS;
+}
+
+int jobcomp_redis_format_job(const redis_fields_t *fields, jobcomp_job_rec_t **job)
+{
+    assert(fields != NULL);
+    assert(job != NULL);
     return SLURM_SUCCESS;
 }

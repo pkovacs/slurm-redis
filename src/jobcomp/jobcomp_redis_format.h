@@ -28,7 +28,9 @@
 
 #include <stdint.h>
 #include <time.h>
-// need this include for struct job_record
+// for jobcomp_job_rec_t record
+#include <src/common/slurm_jobcomp.h>
+// for struct job_record
 #include <src/slurmctld/slurmctld.h>
 
 /*
@@ -107,7 +109,10 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init);
 // De-initialize the formatter
 void jobcomp_redis_format_fini();
 
-// Format an array of redis fields from a struct job_record
+// Format an array of redis fields from a struct job_record (slurm to redis)
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields);
+
+// Format a jobcomp_job_rec_t from an array of redis fields (redis to slurm)
+int jobcomp_redis_format_job(const redis_fields_t *fields, jobcomp_job_rec_t **job);
 
 #endif /* JOBCOMP_REDIS_FORMAT_H */
