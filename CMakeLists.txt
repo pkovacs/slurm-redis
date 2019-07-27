@@ -23,7 +23,7 @@
 #
 
 project(slurm-redis C)
-cmake_minimum_required(VERSION 3.2.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.4.0 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(GNUInstallDirs)
@@ -52,15 +52,18 @@ set(SLURM_REDIS_VERSION_PATCH 0)
 # Set compile flags
 # -----------------
 string(CONCAT LOCAL_C_FLAGS
-    "-Wformat -Wformat-security -fstack-protector-strong "
-    "-Wunused-result -Wall -Wextra "
-    #-Werror")
-    "-Werror=format-security")
+    "-Wunused-result -pipe -Wall -Wextra ")
+string(CONCAT LOCAL_C_FLAGS_DEBUG
+    "-Wformat -Wformat-overflow -Wformat-security -Wformat-truncation ")
+string(CONCAT LOCAL_C_FLAGS_RELEASE
+    "-Werror=format -Werror=format-overflow -Werror=format-security "
+    "-Werror=format-truncation "
+    "-Wp,-D_FORTIFY_SOURCE=2 -fstack-protector-strong ")
 list(APPEND CMAKE_C_FLAGS ${LOCAL_C_FLAGS})
-set(CMAKE_C_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_RELEASE "-O2 -Wp,-D_FORTIFY_SOURCE=2")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -Wp,-D_FORTIFY_SOURCE=2")
-set(CMAKE_C_FLAGS_MINSIZEREL "-Os")
+set(CMAKE_C_FLAGS_DEBUG "-g ${LOCAL_C_FLAGS_DEBUG}")
+set(CMAKE_C_FLAGS_RELEASE "-O2 ${LOCAL_C_FLAGS_RELEASE}")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g ${LOCAL_C_FLAGS_RELEASE}")
+set(CMAKE_C_FLAGS_MINSIZEREL "-Os ${LOCAL_C_FLAGS_RELEASE}")
 
 if(NOT CMAKE_BUILD_TYPE)
     set (CMAKE_BUILD_TYPE "Release")
