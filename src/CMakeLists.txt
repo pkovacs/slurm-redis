@@ -22,4 +22,6 @@
 # SOFTWARE.
 #
 
-add_subdirectory(src)
+add_subdirectory(common)
+add_subdirectory(plugins)
+add_subdirectory(redis)

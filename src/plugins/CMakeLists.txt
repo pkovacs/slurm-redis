@@ -24,8 +24,6 @@
 
 include_directories(
     ${SLURM_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/slurm
 )
 
-add_subdirectory(common)
-add_subdirectory(plugins)
+add_subdirectory(jobcomp)
