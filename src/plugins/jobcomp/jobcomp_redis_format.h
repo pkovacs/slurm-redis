@@ -76,8 +76,8 @@ typedef struct {
 
 #define MAX_REDIS_FIELDS 27
 
-// All supported redis fields
-enum redis_field_enum {
+// Value index of redis field within redis_fields_t
+enum redis_field_value_index {
     kJobID = 0, kPartition = 1, kStart = 2, kEnd = 3, kElapsed = 4, kUID = 5,
     kUser = 6, kGID = 7, kGroup = 8, kNNodes = 9, kNCPUs = 10, kNodeList = 11,
     kJobName = 12, kState = 13, kTimeLimit = 14, kBlockID = 15, kWorkDir = 16,

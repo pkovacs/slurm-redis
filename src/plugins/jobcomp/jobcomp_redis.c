@@ -55,8 +55,8 @@ static const int port = 6379;
 static redisContext *ctx = NULL;
 static char *keytag = NULL;
 
-// Field labels for all supported redis fields
-static const char *field_label[] = {
+// Field labels for redis fields
+static const char *field_labels[] = {
     "JobID", "Partition", "Start", "End", "Elapsed", "UID", "User", "GID",
     "Group", "NNodes", "NCPUs", "NodeList", "JobName", "State", "TimeLimit",
     "BlockID", "WorkDir", "Reservation", "ReqGRES", "Account", "QOS", "WCKey",
@@ -168,7 +168,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         if (fields->value[i]) {
             redisAppendCommand(ctx, "HSET %s:%s %s %s",
                 keytag, fields->value[kJobID],
-                field_label[i], fields->value[i]);
+                field_labels[i], fields->value[i]);
             ++val_count;
         }
     }
