@@ -24,6 +24,11 @@
 
 pkg_check_modules(HIREDIS REQUIRED hiredis)
 
+find_package(Redis)
+if(NOT REDIS_FOUND)
+    message(FATAL_ERROR "Redis development files not found")
+endif()
+
 find_package(Slurm)
 if(NOT SLURM_FOUND)
     message(FATAL_ERROR "Slurm development files not found")
