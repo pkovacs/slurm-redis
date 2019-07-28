@@ -27,16 +27,34 @@
 #include "config.h"
 #endif
 
+#include <redismodule.h>
+
 #include "jobcomp_cmd.h"
 
-int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
-{
-    if (ctx || argv || argc) {}
-    return REDISMODULE_OK;
-}
+const char *module_name = "slurm_jobcomp";
+const int module_version = 1;
 
-int jobcomp_cmd_jobs(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
+int RedisModule_OnLoad(RedisModuleCtx *ctx)
 {
-    if (ctx || argv || argc) {}
+    // Register the module
+    if (RedisModule_Init(ctx, module_name, module_version, REDISMODULE_APIVER_1)
+        == REDISMODULE_ERR) {
+        return REDISMODULE_ERR;
+    }
+
+    // Register the SLURMJC.INDEX command
+    if (RedisModule_CreateCommand(ctx, JOBCOMP_CMD_INDEX, jobcomp_cmd_index,
+            "write", 1, 1, 1)
+        == REDISMODULE_ERR) {
+        return REDISMODULE_ERR;
+    }
+
+    // Register the SLURMJC.JOBS command
+    if (RedisModule_CreateCommand(ctx, JOBCOMP_CMD_JOBS, jobcomp_cmd_jobs,
+            "readonly", 1, 1, 1)
+        == REDISMODULE_ERR) {
+        return REDISMODULE_ERR;
+    }
+
     return REDISMODULE_OK;
 }

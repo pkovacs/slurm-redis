@@ -28,8 +28,8 @@
 
 #include <redismodule.h>
 
-#define JOBCOMP_CMD_CREATE "SLURMJC.INDEX"
-#define JOBCOMP_CMD_INFO "SLURMJC.JOBS"
+#define JOBCOMP_CMD_INDEX "SLURMJC.INDEX"
+#define JOBCOMP_CMD_JOBS "SLURMJC.JOBS"
 
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
 int jobcomp_cmd_jobs(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
