@@ -22,8 +22,18 @@
 # SOFTWARE.
 #
 
-include_directories(
-    ${REDIS_INCLUDE_DIRS}
+# REDIS_INCLUDE_DIRS   - where to find redismodule.h, etc.
+# REDIS_FOUND          - true if redis found
+
+include(FindPackageHandleStandardArgs)
+
+find_path(REDIS_INCLUDE_DIR
+    NAMES redismodule.h
 )
 
-add_subdirectory(jobcomp)
+find_package_handle_standard_args(
+    REDIS REQUIRED_VARS REDIS_INCLUDE_DIR)
+
+if (REDIS_FOUND)
+    set(REDIS_INCLUDE_DIRS ${REDIS_INCLUDE_DIR})
+endif()
