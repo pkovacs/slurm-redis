@@ -22,9 +22,4 @@
 # SOFTWARE.
 #
 
-include_directories(
-    ${SLURM_SOURCE_DIR}
-)
-
-add_subdirectory(common)
-add_subdirectory(jobcomp)
+add_subdirectory(src)

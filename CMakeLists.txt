@@ -101,7 +101,8 @@ include_directories(
 # ------------------
 # Add subdirectories
 # ------------------
-add_subdirectory(src)
+#add_subdirectory(redis)
+add_subdirectory(slurm)
 
 # -----------------
 # Add CPack support
