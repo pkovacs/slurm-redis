@@ -76,8 +76,8 @@ typedef struct {
 
 #define MAX_REDIS_FIELDS 27
 
-// Field indices for all supported redis fields
-enum redis_field_index {
+// All supported redis fields
+enum redis_field_enum {
     kJobID = 0, kPartition = 1, kStart = 2, kEnd = 3, kElapsed = 4, kUID = 5,
     kUser = 6, kGID = 7, kGroup = 8, kNNodes = 9, kNCPUs = 10, kNodeList = 11,
     kJobName = 12, kState = 13, kTimeLimit = 14, kBlockID = 15, kWorkDir = 16,
@@ -109,10 +109,10 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init);
 // De-initialize the formatter
 void jobcomp_redis_format_fini();
 
-// Format an array of redis fields from a struct job_record (slurm to redis)
+// Format redis fields from a struct job_record (slurm to redis)
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields);
 
-// Format a jobcomp_job_rec_t from an array of redis fields (redis to slurm)
+// Format a jobcomp_job_rec_t from redis fields (redis to slurm)
 int jobcomp_redis_format_job(const redis_fields_t *fields, jobcomp_job_rec_t **job);
 
 #endif /* JOBCOMP_REDIS_FORMAT_H */

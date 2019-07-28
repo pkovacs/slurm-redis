@@ -139,7 +139,7 @@ int slurm_jobcomp_set_location(char *location)
     if (location) {
         keytag = xstrdup(location);
     } else {
-        keytag = xstrdup("");
+        keytag = xstrdup("job");
     }
 
     return SLURM_SUCCESS;
@@ -162,7 +162,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         // todo, e.g. we MUST have fields->value[kJobID]
     }
 
-    // Pipeline redis commands
+    // Set redis field-value pairs using a redis pipeline
     int i = 0, val_count = 0;
     for (; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
