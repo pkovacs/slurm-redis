@@ -23,7 +23,6 @@
 #
 
 include_directories(
-    ${HIREDIS_INCLUDE_DIRS}
     ${SLURM_SOURCE_DIR}
 )
 
