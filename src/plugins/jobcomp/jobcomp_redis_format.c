@@ -164,9 +164,9 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         (*fields)->value[kUID] = xstrdup(buf);
     }
 
-    // Below and all the way to the bottom are data for which the absence
-    // of a value on the job record means we store no hash value in redis
-    // at all, thus saving memory.
+    // Below and all the way to the bottom of the function are data for which
+    // the absence of a value on the job record means we store no hash value
+    // in redis at all, thus saving memory.
 
     if (job->details) {
         if (job->details->submit_time) {

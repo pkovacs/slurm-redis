@@ -159,22 +159,27 @@ int slurm_jobcomp_log_record(struct job_record *job)
     redis_fields_t *fields = NULL;
     int rc = jobcomp_redis_format_fields(job, &fields);
     if (rc != SLURM_SUCCESS) {
-        // todo, e.g. we MUST have fields->value[kJobID]
+        // TODO: e.g. we MUST have fields->value[kJobID]
     }
 
-    // Set redis field-value pairs using a redis pipeline
-    int i = 0, val_count = 0;
+    // Add the job's field-value pairs to a new redis key
+    int i = 0, pipeline = 0;
     for (; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
             redisAppendCommand(ctx, "HSET %s:%s %s %s",
                 keytag, fields->value[kJobID],
                 field_labels[i], fields->value[i]);
-            ++val_count;
+            ++pipeline;
         }
     }
+    // Index the new job on the redis server
+    redisAppendCommand(ctx, "SLURMJC.INDEX %s %s",
+        keytag, fields->value[kJobID]);
+    ++pipeline;
 
+    // TODO: error checking
     // Pop off the pipelined replies
-    for (i = 0; i < val_count; ++i) {
+    for (i = 0; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
         freeReplyObject(reply);
         reply = NULL;
