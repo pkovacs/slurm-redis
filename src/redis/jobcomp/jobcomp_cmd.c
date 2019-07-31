@@ -29,25 +29,37 @@
 
 #include "jobcomp_cmd.h"
 
+#include <limits.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
-static int days_since_unix_epoch(const char *iso8601_date, long long *days)
+static int days_since_unix_epoch(const char *iso8601_date, long long *days,
+                                 long long *residual_seconds)
 {
-    struct tm tm_date;
-    time_t start_time;
-    int y, M, d;
-    if (sscanf(iso8601_date, "%d-%d-%d", &y, &M, &d) != 3) {
+    int y, M, d, h, m, s;
+    if (sscanf(iso8601_date, "%d-%d-%dT%d:%d:%d", &y, &M, &d, &h, &m, &s)
+        != 6) {
         return -1;
     }
-    memset(&tm_date, 0, sizeof(tm_date));
-    tm_date.tm_year = y - 1900;
-    tm_date.tm_mon = M - 1;
-    tm_date.tm_mday = d;
-    start_time = mktime(&tm_date);
+    struct tm tm_date = {
+        .tm_year = y - 1900,
+        .tm_mon = M - 1,
+        .tm_mday = d,
+        .tm_hour = h,
+        .tm_min = m,
+        .tm_sec = s,
+        .tm_isdst = -1
+    };
+    time_t start_time = timegm(&tm_date);
+    if (start_time < 0) {
+        return -1;
+    }
     if (days) {
         *days = start_time / 86400;
+    }
+    if (residual_seconds) {
+        *residual_seconds = start_time % 86400;
     }
     return 0;
 }
@@ -65,7 +77,7 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_CreateStringPrintf(ctx, "%s:%s", keytag, jobid);
     RedisModuleCallReply *reply = NULL;
 
-    // Open the jobid key that was created in the slurm jobcomp plugin
+    // Open the job key
     RedisModuleKey *key = RedisModule_OpenKey(ctx, keyname, REDISMODULE_READ);
     if ((RedisModule_KeyType(key) == REDISMODULE_KEYTYPE_EMPTY) ||
         (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_HASH)) {
@@ -73,76 +85,56 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         goto error;
     }
 
-    // Create or update the uid index
-    RedisModuleString *uid = NULL;
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "UID", &uid, NULL)
-        == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(ctx, "UID key missing");
-        goto error;
-    }
-    const char *uid_c = RedisModule_StringPtrLen(uid, NULL);
-    RedisModuleString *idxname_uid =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:uid:%s", keytag, uid_c);
-    reply = RedisModule_Call(ctx, "SADD", "sc", idxname_uid, jobid);
-    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
-        RedisModule_ReplyWithCallReply(ctx, reply);
+    // Fetch the index values for this job
+    RedisModuleString *start = NULL, *end = NULL, *uid = NULL;
+    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "Start", &start,
+            "End", &end, "UID", &uid, NULL) == REDISMODULE_ERR) {
+        RedisModule_ReplyWithError(ctx, "expected key(s) missing");
         goto error;
     }
 
-    // Create or update the partition index
-    RedisModuleString *partition = NULL;
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "Partition",
-        &partition, NULL) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(ctx, "Partition key missing");
-        goto error;
-    }
-    const char *partition_c = RedisModule_StringPtrLen(partition, NULL);
-    RedisModuleString *idxname_partition =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:partition:%s", keytag,
-            partition_c);
-    reply = RedisModule_Call(ctx, "SADD", "sc", idxname_partition, jobid);
-    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
-        RedisModule_ReplyWithCallReply(ctx, reply);
-        goto error;
-    }
-
-    // Create or update the jobname index
-    RedisModuleString *jobname = NULL;
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "JobName",
-        &jobname, NULL) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(ctx, "JobName key missing");
-        goto error;
-    }
-    const char *jobname_c = RedisModule_StringPtrLen(jobname, NULL);
-    RedisModuleString *idxname_jobname =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:jobname:%s", keytag,
-            jobname_c);
-    reply = RedisModule_Call(ctx, "SADD", "sc", idxname_jobname, jobid);
-    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
-        RedisModule_ReplyWithCallReply(ctx, reply);
-        goto error;
-    }
-
-    // Create or update the start index (daily bins)
-    RedisModuleString *start = NULL;
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "Start", &start, NULL)
-        == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(ctx, "Start key missing");
-        goto error;
-    }
-    long long days = 0;
-    if (days_since_unix_epoch(RedisModule_StringPtrLen(start, NULL), &days) < 0) {
+    // Create or update the start index
+    long long days = 0, zscore = 0;
+    if (days_since_unix_epoch(RedisModule_StringPtrLen(start, NULL), &days,
+            &zscore) < 0) {
         RedisModule_ReplyWithError(ctx, "Failed to parse start date");
         goto error;
     }
-    RedisModuleString *idxname_start =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:start:%ld", keytag, days);
-    reply = RedisModule_Call(ctx, "SADD", "sc", idxname_start, jobid);
-    //if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
+    RedisModuleString *idx_start =
+        RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:start", keytag, days);
+    reply = RedisModule_Call(ctx, "ZADD", "slc", idx_start, zscore, jobid);
+    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
-    //    goto error;
-    //}
+        goto error;
+    }
 
+    // Create or update the uid index
+    const char *uid_c = RedisModule_StringPtrLen(uid, NULL);
+    RedisModuleString *idx_uid =
+        RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:uid:%s", keytag, days,
+            uid_c);
+    reply = RedisModule_Call(ctx, "SADD", "sc", idx_uid, jobid);
+    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
+        RedisModule_ReplyWithCallReply(ctx, reply);
+        goto error;
+    }
+
+    // Create or update the end index
+    days = 0, zscore = 0;
+    if (days_since_unix_epoch(RedisModule_StringPtrLen(end, NULL), &days,
+            &zscore) < 0) {
+        RedisModule_ReplyWithError(ctx, "Failed to parse end date");
+        goto error;
+    }
+    RedisModuleString *idx_end =
+        RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:end", keytag, days);
+    reply = RedisModule_Call(ctx, "ZADD", "slc", idx_end, zscore, jobid);
+    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
+        RedisModule_ReplyWithCallReply(ctx, reply);
+        goto error;
+    }
+
+    RedisModule_ReplyWithSimpleString(ctx, "OK");
     RedisModule_CloseKey(key);
     return REDISMODULE_OK;
 
@@ -151,8 +143,45 @@ error:
     return REDISMODULE_ERR;
 }
 
-int jobcomp_cmd_jobs(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
+int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
-    if (ctx || argv || argc) {}
+    RedisModule_AutoMemory(ctx);
+    if (argc != 2) {
+        return RedisModule_WrongArity(ctx);
+    }
+
+    //const char *keyname = RedisModule_StringPtrLen(argv[1], NULL);
+
+    // Open the query key
+    RedisModuleKey *key = RedisModule_OpenKey(ctx, argv[1], REDISMODULE_READ);
+    if ((RedisModule_KeyType(key) == REDISMODULE_KEYTYPE_EMPTY) ||
+        (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_HASH)) {
+        RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
+        goto error;
+    }
+
+    // Fetch the time range for this query
+    RedisModuleString *start = NULL, *end = NULL;
+    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "Start", &start,
+            "End", &end, NULL) == REDISMODULE_ERR) {
+        RedisModule_ReplyWithError(ctx, "expected key(s) missing");
+        goto error;
+    }
+
+    time_t start_time, end_time;
+    start_time = strtol(RedisModule_StringPtrLen(start, NULL), NULL, 10);
+    end_time = strtol(RedisModule_StringPtrLen(end, NULL), NULL, 10);
+    if ((start_time == LONG_MIN) || (start_time == LONG_MAX) ||
+        (end_time == LONG_MIN) || (end_time == LONG_MAX)) {
+        RedisModule_ReplyWithError(ctx, "invalid time range");
+        goto error;
+    }
+
+    RedisModule_ReplyWithSimpleString(ctx, "OK");
+    RedisModule_CloseKey(key);
     return REDISMODULE_OK;
+
+error:
+    RedisModule_CloseKey(key);
+    return REDISMODULE_ERR;
 }

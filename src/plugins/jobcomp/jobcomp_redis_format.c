@@ -32,8 +32,11 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
+// for uid_to_string, gid_to_string
 #include <src/common/uid.h>
+// for xmalloc, xfree
 #include <src/common/xmalloc.h>
+// for xstrdup
 #include <src/common/xstring.h>
 
 #include "src/common/ttl_hash.h"

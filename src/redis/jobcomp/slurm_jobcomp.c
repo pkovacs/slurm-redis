@@ -49,9 +49,9 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx)
         return REDISMODULE_ERR;
     }
 
-    // Register the SLURMJC.JOBS command
-    if (RedisModule_CreateCommand(ctx, JOBCOMP_CMD_JOBS, jobcomp_cmd_jobs,
-            "readonly", 1, 1, 1)
+    // Register the SLURMJC.MATCH command
+    if (RedisModule_CreateCommand(ctx, JOBCOMP_CMD_MATCH, jobcomp_cmd_match,
+            "write", 1, 1, 1)
         == REDISMODULE_ERR) {
         return REDISMODULE_ERR;
     }

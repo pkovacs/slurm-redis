@@ -29,10 +29,16 @@
 
 #include <string.h>
 #include <hiredis.h>
+#include <uuid.h>
+// for List, SLURM_VERSION_NUMBER, SLURM_SUCCESS, etc.
 #include <slurm/slurm.h>
+// for slurm_verbose, slurm_debug, etc.
 #include <slurm/spank.h>
+// for xmalloc, xfree
 #include <src/common/xmalloc.h>
+// for xstrdup
 #include <src/common/xstring.h>
+// for struct job_record
 #include <src/slurmctld/slurmctld.h>
 
 #include "jobcomp_redis_format.h"
@@ -41,6 +47,8 @@
 #define GROUP_CACHE_SZ 64
 #define USER_CACHE_TTL 120
 #define GROUP_CACHE_TTL 120
+
+#define REQUEST_KEY_TTL 300
 
 const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
@@ -92,6 +100,20 @@ static int redis_connected(void)
     return rc;
 }
 
+static int redis_list_push(const char *key, const List list) {
+    char *value;
+    int pipeline = 0;
+    ListIterator it = list_iterator_create(list);
+    while ((value = list_next(it))) {
+        redisAppendCommand(ctx, "LPUSH %s %s", key, value);
+        ++pipeline;
+    }
+    redisAppendCommand(ctx, "EXPIRE %s %u", key, REQUEST_KEY_TTL);
+    ++pipeline;
+    list_iterator_destroy(it);
+    return pipeline;
+}
+
 int init(void)
 {
     static int once = 0;
@@ -139,7 +161,9 @@ int slurm_jobcomp_set_location(char *location)
     if (location) {
         keytag = xstrdup(location);
     } else {
-        keytag = xstrdup("job");
+        if (!(keytag = slurm_get_jobcomp_loc())) {
+            keytag = xstrdup("job");
+        }
     }
 
     return SLURM_SUCCESS;
@@ -155,7 +179,6 @@ int slurm_jobcomp_log_record(struct job_record *job)
         redis_connect();
     }
 
-    redisReply *reply;
     redis_fields_t *fields = NULL;
     int rc = jobcomp_redis_format_fields(job, &fields);
     if (rc != SLURM_SUCCESS) {
@@ -172,13 +195,15 @@ int slurm_jobcomp_log_record(struct job_record *job)
             ++pipeline;
         }
     }
-    // Index the new job on the redis server
+
+    // Index the job on the redis server
     redisAppendCommand(ctx, "SLURMJC.INDEX %s %s",
         keytag, fields->value[kJobID]);
     ++pipeline;
 
     // TODO: error checking
     // Pop off the pipelined replies
+    redisReply *reply;
     for (i = 0; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
         freeReplyObject(reply);
@@ -198,11 +223,104 @@ int slurm_jobcomp_log_record(struct job_record *job)
     return SLURM_SUCCESS;
 }
 
-List slurm_jobcomp_get_jobs(__attribute__ ((unused)) void *job_cond)
+#if 0
+typedef struct {
+    List acct_list;     /* list of char * */
+    List associd_list;  /* list of char */
+    List cluster_list;  /* list of char * */
+    uint32_t cpus_max;  /* number of cpus high range */
+    uint32_t cpus_min;  /* number of cpus low range */
+    int32_t exitcode;   /* exit code of job */
+    uint32_t flags;     /* Reporting flags*/
+    List format_list;   /* list of char * */
+    List groupid_list;  /* list of char * */
+    List jobname_list;  /* list of char * */
+    uint32_t nodes_max; /* number of nodes high range */
+    uint32_t nodes_min; /* number of nodes low range */
+    List partition_list;/* list of char * */
+    List qos_list;      /* list of char * */
+    List resv_list;     /* list of char * */
+    List resvid_list;   /* list of char * */
+    List state_list;    /* list of char * */
+    List step_list;     /* list of slurmdb_selected_step_t */
+    uint32_t timelimit_max; /* max timelimit */
+    uint32_t timelimit_min; /* min timelimit */
+    time_t usage_end;
+    time_t usage_start;
+    char *used_nodes;   /* a ranged node string where jobs ran */
+    List userid_list;   /* list of char * */
+    List wckey_list;    /* list of char * */
+} slurmdb_job_cond_t;
+#endif
+
+
+List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 {
+    if (!job_cond) {
+        return SLURM_SUCCESS;
+    }
+
     if (!redis_connected()) {
         redis_connect();
     }
+
+    int i, pipeline = 0;
+    char uuid_s[37];
+    char key[128];
+    uuid_t uuid;
+
+    // Generate a random uuid for the request keys
+    uuid_generate(uuid);
+    uuid_unparse(uuid, uuid_s);
+
+    // Create a hash set for the scalar condition values
+    redisAppendCommand(ctx, "HSET %s:qry:%s Start %ld End %ld", keytag,
+        uuid_s, job_cond->usage_start, job_cond->usage_end);
+    redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", keytag, uuid_s,
+        REQUEST_KEY_TTL);
+    pipeline += 2;
+
+    // Create a redis list for userid_list
+    if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", keytag, uuid_s);
+        pipeline += redis_list_push(key, job_cond->userid_list);
+    }
+
+    // Create a redis list for groupid_list
+    if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", keytag, uuid_s);
+        pipeline += redis_list_push(key, job_cond->groupid_list);
+    }
+
+    // Create a redis list for jobname_list
+    if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", keytag, uuid_s);
+        pipeline += redis_list_push(key, job_cond->jobname_list);
+    }
+
+    // Create a redis list for partition_list
+    if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", keytag, uuid_s);
+        pipeline += redis_list_push(key, job_cond->partition_list);
+    }
+
+    // Ask the redis server for matches to the criteria we sent
+    redisAppendCommand(ctx, "SLURMJC.MATCH %s:qry:%s", keytag, uuid_s);
+    ++pipeline;
+
+    // TODO: error checking
+    // Pop off the pipelined replies
+    redisReply *reply;
+    for (i = 0; i < pipeline; ++i) {
+        redisGetReply(ctx, (void **)&reply);
+        freeReplyObject(reply);
+        reply = NULL;
+    }
+
     return NULL;
 }
 

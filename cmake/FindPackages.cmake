@@ -23,6 +23,7 @@
 #
 
 pkg_check_modules(HIREDIS REQUIRED hiredis)
+pkg_check_modules(UUID REQUIRED uuid)
 
 find_package(Redis)
 if(NOT REDIS_FOUND)

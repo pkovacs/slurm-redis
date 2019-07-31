@@ -29,9 +29,9 @@
 #include <redismodule.h>
 
 #define JOBCOMP_CMD_INDEX "SLURMJC.INDEX"
-#define JOBCOMP_CMD_JOBS "SLURMJC.JOBS"
+#define JOBCOMP_CMD_MATCH "SLURMJC.MATCH"
 
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
-int jobcomp_cmd_jobs(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
+int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
 
 #endif /* JOBCOMP_CMD_H */

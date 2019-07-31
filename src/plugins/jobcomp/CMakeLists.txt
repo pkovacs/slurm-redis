@@ -36,15 +36,18 @@ set_target_properties(jobcomp_redis
 
 target_compile_options(jobcomp_redis
     PRIVATE ${HIREDIS_CFLAGS_OTHER}
+    PRIVATE ${UUID_CFLAGS_OTHER}
 )
 
 target_include_directories(jobcomp_redis
     PRIVATE ${HIREDIS_INCLUDE_DIRS}
+    PRIVATE ${UUID_INCLUDE_DIRS}
 )
 
 target_link_libraries(jobcomp_redis
     PRIVATE $<TARGET_OBJECTS:common>
     PRIVATE ${HIREDIS_LIBRARIES}
+    PRIVATE ${UUID_LIBRARIES}
     PRIVATE ${SLURM_LIBRARIES}
     Threads::Threads
 )
