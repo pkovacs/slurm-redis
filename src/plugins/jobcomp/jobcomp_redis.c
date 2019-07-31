@@ -100,12 +100,12 @@ static int redis_connected(void)
     return rc;
 }
 
-static int redis_list_push(const char *key, const List list) {
+static int redis_sadd_list(const char *key, const List list) {
     char *value;
     int pipeline = 0;
     ListIterator it = list_iterator_create(list);
     while ((value = list_next(it))) {
-        redisAppendCommand(ctx, "LPUSH %s %s", key, value);
+        redisAppendCommand(ctx, "SADD %s %s", key, value);
         ++pipeline;
     }
     redisAppendCommand(ctx, "EXPIRE %s %u", key, REQUEST_KEY_TTL);
@@ -280,32 +280,32 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         REQUEST_KEY_TTL);
     pipeline += 2;
 
-    // Create a redis list for userid_list
+    // Create a set for userid_list
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", keytag, uuid_s);
-        pipeline += redis_list_push(key, job_cond->userid_list);
+        pipeline += redis_sadd_list(key, job_cond->userid_list);
     }
 
-    // Create a redis list for groupid_list
+    // Create a set for groupid_list
     if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", keytag, uuid_s);
-        pipeline += redis_list_push(key, job_cond->groupid_list);
+        pipeline += redis_sadd_list(key, job_cond->groupid_list);
     }
 
-    // Create a redis list for jobname_list
+    // Create a set for jobname_list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", keytag, uuid_s);
-        pipeline += redis_list_push(key, job_cond->jobname_list);
+        pipeline += redis_sadd_list(key, job_cond->jobname_list);
     }
 
-    // Create a redis list for partition_list
+    // Create a set for partition_list
     if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", keytag, uuid_s);
-        pipeline += redis_list_push(key, job_cond->partition_list);
+        pipeline += redis_sadd_list(key, job_cond->partition_list);
     }
 
     // Ask the redis server for matches to the criteria we sent
@@ -321,6 +321,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         reply = NULL;
     }
 
+    // TODO: send deletes to redis for the qry and result set
     return NULL;
 }
 

@@ -85,7 +85,7 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         goto error;
     }
 
-    // Fetch the index values for this job
+    // Fetch the job values we want to index
     RedisModuleString *start = NULL, *end = NULL, *uid = NULL;
     if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "Start", &start,
             "End", &end, "UID", &uid, NULL) == REDISMODULE_ERR) {
@@ -94,15 +94,16 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     }
 
     // Create or update the start index
-    long long days = 0, zscore = 0;
-    if (days_since_unix_epoch(RedisModule_StringPtrLen(start, NULL), &days,
-            &zscore) < 0) {
+    long long start_days = 0, start_score = 0;
+    if (days_since_unix_epoch(RedisModule_StringPtrLen(start, NULL),
+            &start_days, &start_score) < 0) {
         RedisModule_ReplyWithError(ctx, "Failed to parse start date");
         goto error;
     }
-    RedisModuleString *idx_start =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:start", keytag, days);
-    reply = RedisModule_Call(ctx, "ZADD", "slc", idx_start, zscore, jobid);
+    RedisModuleString *idx_start = RedisModule_CreateStringPrintf(ctx,
+        "%s:idx:%ld:start", keytag, start_days);
+    reply = RedisModule_Call(ctx, "ZADD", "slc", idx_start, start_score,
+        jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
         goto error;
@@ -110,9 +111,8 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     // Create or update the uid index
     const char *uid_c = RedisModule_StringPtrLen(uid, NULL);
-    RedisModuleString *idx_uid =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:uid:%s", keytag, days,
-            uid_c);
+    RedisModuleString *idx_uid = RedisModule_CreateStringPrintf(ctx,
+        "%s:idx:%ld:uid:%s", keytag, start_days, uid_c);
     reply = RedisModule_Call(ctx, "SADD", "sc", idx_uid, jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
@@ -120,15 +120,15 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     }
 
     // Create or update the end index
-    days = 0, zscore = 0;
-    if (days_since_unix_epoch(RedisModule_StringPtrLen(end, NULL), &days,
-            &zscore) < 0) {
+    long long end_days = 0, end_score = 0;
+    if (days_since_unix_epoch(RedisModule_StringPtrLen(end, NULL),
+            &end_days, &end_score) < 0) {
         RedisModule_ReplyWithError(ctx, "Failed to parse end date");
         goto error;
     }
-    RedisModuleString *idx_end =
-        RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:end", keytag, days);
-    reply = RedisModule_Call(ctx, "ZADD", "slc", idx_end, zscore, jobid);
+    RedisModuleString *idx_end = RedisModule_CreateStringPrintf(ctx,
+        "%s:idx:%ld:end", keytag, end_days);
+    reply = RedisModule_Call(ctx, "ZADD", "slc", idx_end, end_score, jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
         goto error;
