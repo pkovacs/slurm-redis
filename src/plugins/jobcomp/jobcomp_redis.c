@@ -48,7 +48,7 @@
 #define USER_CACHE_TTL 120
 #define GROUP_CACHE_TTL 120
 
-#define REQUEST_KEY_TTL 300
+#define QUERY_KEY_TTL 300
 
 const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
@@ -100,15 +100,15 @@ static int redis_connected(void)
     return rc;
 }
 
-static int redis_sadd_list(const char *key, const List list) {
+static int redis_push_list(const char *key, const List list) {
     char *value;
     int pipeline = 0;
     ListIterator it = list_iterator_create(list);
     while ((value = list_next(it))) {
-        redisAppendCommand(ctx, "SADD %s %s", key, value);
+        redisAppendCommand(ctx, "LPUSH %s %s", key, value);
         ++pipeline;
     }
-    redisAppendCommand(ctx, "EXPIRE %s %u", key, REQUEST_KEY_TTL);
+    redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_KEY_TTL);
     ++pipeline;
     list_iterator_destroy(it);
     return pipeline;
@@ -273,43 +273,43 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     uuid_generate(uuid);
     uuid_unparse(uuid, uuid_s);
 
-    // Create a hash set for the scalar condition values
+    // Create redis hash set for the scalar condition values
     redisAppendCommand(ctx, "HSET %s:qry:%s Start %ld End %ld", keytag,
         uuid_s, job_cond->usage_start, job_cond->usage_end);
     redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", keytag, uuid_s,
-        REQUEST_KEY_TTL);
+        QUERY_KEY_TTL);
     pipeline += 2;
 
-    // Create a set for userid_list
+    // Create redis list for userid_list
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->userid_list);
+        pipeline += redis_push_list(key, job_cond->userid_list);
     }
 
-    // Create a set for groupid_list
+    // Create redis list for groupid_list
     if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->groupid_list);
+        pipeline += redis_push_list(key, job_cond->groupid_list);
     }
 
-    // Create a set for jobname_list
+    // Create redis list for jobname_list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->jobname_list);
+        pipeline += redis_push_list(key, job_cond->jobname_list);
     }
 
-    // Create a set for partition_list
+    // Create redis list for partition_list
     if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->partition_list);
+        pipeline += redis_push_list(key, job_cond->partition_list);
     }
 
     // Ask the redis server for matches to the criteria we sent
-    redisAppendCommand(ctx, "SLURMJC.MATCH %s:qry:%s", keytag, uuid_s);
+    redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", keytag, uuid_s);
     ++pipeline;
 
     // TODO: error checking
