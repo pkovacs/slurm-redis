@@ -42,6 +42,7 @@ target_compile_options(jobcomp_redis
 target_include_directories(jobcomp_redis
     PRIVATE ${HIREDIS_INCLUDE_DIRS}
     PRIVATE ${UUID_INCLUDE_DIRS}
+    PRIVATE ${SLURM_SOURCE_DIR}
 )
 
 target_link_libraries(jobcomp_redis

@@ -34,6 +34,10 @@ set_target_properties(slurm_jobcomp
     PREFIX ""
 )
 
+target_include_directories(slurm_jobcomp
+    PRIVATE ${REDIS_INCLUDE_DIRS}
+)
+
 target_link_libraries(slurm_jobcomp
     PRIVATE $<TARGET_OBJECTS:common_redis>
 )

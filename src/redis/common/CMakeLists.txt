@@ -32,3 +32,7 @@ set_target_properties(common_redis
     PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
+
+target_include_directories(common_redis
+    PRIVATE ${REDIS_INCLUDE_DIRS}
+)
