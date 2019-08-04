@@ -40,7 +40,6 @@ typedef struct sscan_cursor {
     RedisModuleString *set;
     RedisModuleString *err;
     RedisModuleCallReply *reply;
-    RedisModuleCallReply *subreply_cursor;
     RedisModuleCallReply *subreply_array;
     long long count;
     long long cursor;
@@ -54,7 +53,6 @@ static void call_sscan_internal(sscan_cursor_t cursor)
         // This recursively frees the subreplies too
         RedisModule_FreeCallReply(cursor->reply);
         cursor->reply = NULL;
-        cursor->subreply_cursor = NULL;
         cursor->subreply_array = NULL;
     }
     cursor->next_element = 0;
@@ -73,16 +71,16 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     }
 
     // Fetch the cursor value on the first element; zero means last iteration
-    cursor->subreply_cursor = RedisModule_CallReplyArrayElement(cursor->reply,
-        0);
-    if ((RedisModule_CallReplyType(cursor->subreply_cursor)
+    RedisModuleCallReply *subreply_cursor = RedisModule_CallReplyArrayElement(
+        cursor->reply, 0);
+    if ((RedisModule_CallReplyType(subreply_cursor)
         != REDISMODULE_REPLY_STRING)) {
         cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
             REDISMODULE_ERRORMSG_WRONGTYPE);
         return;
     }
 
-    // Fetch the array of values on the second element; can be NULL 
+    // Fetch the array of values on the second element; can be NULL
     cursor->subreply_array = RedisModule_CallReplyArrayElement(cursor->reply,
         1);
     if (cursor->subreply_array &&
@@ -97,8 +95,8 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     }
 
     // Convert the string cursor value to an integer
-    cursor->cursor = strtoll(RedisModule_CallReplyStringPtr(
-        cursor->subreply_cursor, NULL), NULL, 10);
+    cursor->cursor = strtoll(RedisModule_CallReplyStringPtr(subreply_cursor,
+        NULL), NULL, 10);
     if ((errno == ERANGE &&
             (cursor->cursor == LLONG_MAX || cursor->cursor == LLONG_MIN))
         || (errno != 0 && cursor->cursor == 0)) {
@@ -119,8 +117,7 @@ sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init)
     cursor->ctx = init->ctx;
     cursor->set = init->set;
     cursor->count = init->count;
-
-    call_sscan_internal(cursor);
+    cursor->cursor = -1;
     return cursor;
 }
 
@@ -147,23 +144,20 @@ const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
         RedisModule_FreeString(cursor->ctx, cursor->err);
         cursor->err = NULL;
     }
-
-    if (!cursor->reply) {
-        cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
-            "no open cursor"); 
-        goto final;
-    }
-        
-    if (cursor->cursor != 0 &&
-            (cursor->next_element >= cursor->total_elements)) {
+    // We are hiding the necessary repeated calls to SSCAN with this api.
+    // In order to complete a full iteration with SSCAN, it is required that
+    // we keep calling it while the cursor is non-zero.  We consume the array
+    // with each call until the SSCAN cursor value hits zero.  The returned
+    // array can legally come back NULL in which case we keep calling SSCAN
+    // until values appear on the array OR the cursor comes back zero.
+    while (cursor->cursor != 0 && cursor->subreply_array == NULL) {
         call_sscan_internal(cursor);
+        if (cursor->err) {
+            return RedisModule_StringPtrLen(cursor->err, len);
+        }
     }
-
-    if (cursor->total_elements == 0) {
-        goto final;
-    }
-
-    if (cursor->next_element < cursor->total_elements) {
+    if (cursor->subreply_array &&
+        (cursor->next_element < cursor->total_elements)) {
         RedisModuleCallReply *subreply_element =
             RedisModule_CallReplyArrayElement(cursor->subreply_array,
                 cursor->next_element);
@@ -173,7 +167,6 @@ const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
                 &element_sz);
         }
     }
-final:
     if (len) {
         *len = element_sz;
     }
@@ -197,7 +190,6 @@ void destroy_sscan_cursor(sscan_cursor_t cursor)
         // This recursively frees the subreplies too
         RedisModule_FreeCallReply(cursor->reply);
         cursor->reply = NULL;
-        cursor->subreply_cursor = NULL;
         cursor->subreply_array = NULL;
     }
     RedisModule_Free(cursor);
