@@ -115,11 +115,11 @@ static int create_match_set(RedisModuleCtx *ctx, long long start_time,
         const char *element, *err;
         size_t element_sz, err_sz;
 
-        sscan_cursor_t cursor = open_sscan_cursor(&init);
+        sscan_cursor_t cursor = create_sscan_cursor(&init);
         err = sscan_error(cursor, &err_sz);
         if (err) {
             RedisModule_ReplyWithError(ctx, err);
-            close_sscan_cursor(cursor);
+            destroy_sscan_cursor(cursor);
             return REDISMODULE_ERR;
         }
         do {
@@ -127,7 +127,7 @@ static int create_match_set(RedisModuleCtx *ctx, long long start_time,
             err = sscan_error(cursor, &err_sz);
             if (err) {
                 RedisModule_ReplyWithError(ctx, err);
-                close_sscan_cursor(cursor);
+                destroy_sscan_cursor(cursor);
                 return REDISMODULE_ERR;
             }
             if (element) {
@@ -136,7 +136,7 @@ static int create_match_set(RedisModuleCtx *ctx, long long start_time,
                         (job == LLONG_MAX || job == LLONG_MIN))
                     || (errno != 0 && job == 0)) {
                     RedisModule_ReplyWithError(ctx, "invalid job id");
-                    close_sscan_cursor(cursor);
+                    destroy_sscan_cursor(cursor);
                     return REDISMODULE_ERR;
                 }
 
@@ -145,7 +145,7 @@ static int create_match_set(RedisModuleCtx *ctx, long long start_time,
                 //}
             }
         } while (element);
-        close_sscan_cursor(cursor);
+        destroy_sscan_cursor(cursor);
     }
 
     return REDISMODULE_OK;

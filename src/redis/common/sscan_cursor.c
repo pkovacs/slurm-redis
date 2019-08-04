@@ -108,7 +108,7 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     }
 }
 
-sscan_cursor_t open_sscan_cursor(const sscan_cursor_init_t *init)
+sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init)
 {
     assert(init != NULL);
     assert(init->ctx != NULL);
@@ -180,7 +180,7 @@ final:
     return element;
 }
 
-void close_sscan_cursor(sscan_cursor_t cursor)
+void destroy_sscan_cursor(sscan_cursor_t cursor)
 {
     assert(cursor != NULL);
     assert(cursor->ctx != NULL);

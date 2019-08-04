@@ -43,8 +43,8 @@ typedef struct {
     long long count;
 } sscan_cursor_init_t;
 
-// Open a set scan cursor 
-sscan_cursor_t open_sscan_cursor(const sscan_cursor_init_t *init);
+// Create a set scan cursor
+sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init);
 
 // Check for error
 const char *sscan_error(sscan_cursor_t cursor, size_t *len);
@@ -52,7 +52,7 @@ const char *sscan_error(sscan_cursor_t cursor, size_t *len);
 // Return next string of the cursor
 const char *sscan_next_element(sscan_cursor_t cursor, size_t *len);
 
-// Close a set scan cursor
-void close_sscan_cursor(sscan_cursor_t cursor);
+// Destroy a set scan cursor
+void destroy_sscan_cursor(sscan_cursor_t cursor);
 
 #endif /* SSCAN_CURSOR_H */
