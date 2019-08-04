@@ -158,14 +158,17 @@ int slurm_jobcomp_set_location(char *location)
         return SLURM_ERROR;
     }
 
-    if (location) {
-        keytag = xstrdup(location);
-    } else {
-        if (!(keytag = slurm_get_jobcomp_loc())) {
-            keytag = xstrdup("job");
-        }
+    if (keytag) {
+        return SLURM_SUCCESS;
     }
 
+    char *loc = location ? xstrdup(location) : slurm_get_jobcomp_loc();
+    if (!loc || strcmp(loc, DEFAULT_JOB_COMP_LOC) == 0) {
+        keytag = xstrdup("job");
+    } else if (loc) {
+        keytag = xstrdup_printf("%s:job", loc);
+    }
+    xfree(loc);
     return SLURM_SUCCESS;
 }
 
