@@ -26,4 +26,5 @@ include_directories(
     ${REDIS_INCLUDE_DIRS}
 )
 
+add_subdirectory(common)
 add_subdirectory(jobcomp)

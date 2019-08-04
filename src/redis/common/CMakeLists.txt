@@ -22,22 +22,13 @@
 # SOFTWARE.
 #
 
-add_library(slurm_jobcomp MODULE
-    slurm_jobcomp.c
-    jobcomp_cmd.c
-    jobcomp_cmd.h
+add_library(common_redis OBJECT
+    sscan_cursor.c
+    sscan_cursor.h
 )
 
-set_target_properties(slurm_jobcomp
+# Object libraries are not PIC by default
+set_target_properties(common_redis
     PROPERTIES
-    OUTPUT_NAME "slurm_jobcomp"
-    PREFIX ""
+    POSITION_INDEPENDENT_CODE ON
 )
-
-target_link_libraries(slurm_jobcomp
-    PRIVATE $<TARGET_OBJECTS:common_redis>
-)
-
-install(TARGETS
-    slurm_jobcomp
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/slurm/redis)

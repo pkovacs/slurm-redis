@@ -23,43 +23,36 @@
  *
  */
 
-#ifndef TTL_HASH_H
-#define TTL_HASH_H
+#ifndef SSCAN_CURSOR_H
+#define SSCAN_CURSOR_H
 
 #include <stddef.h>
+#include <redismodule.h>
 
 /*
- * A thread-safe hash for storing key/values with time-to-live (ttl)
+ * A wrapper for creating and iterating over redis set scan cursors
  */
 
-enum {
-    HASH_BUSY = -1,
-    HASH_OK = 0,
-    HASH_NOT_FOUND = 2,
-    HASH_EXPIRED = 3
-};
+// Set scan cursor is an opaque pointer
+typedef struct sscan_cursor *sscan_cursor_t;
 
-// Hash is an opaque pointer
-typedef struct ttl_hash *ttl_hash_t;
-
-// Hash initialization
+// Set scan cursor initialization
 typedef struct {
-    // Number of hash entries
-    size_t hash_sz;
-    // Time-to-live in seconds of hash entries
-    size_t hash_ttl;
-} ttl_hash_init_t;
+    RedisModuleCtx *ctx;
+    RedisModuleString *set;
+    long long count;
+} sscan_cursor_init_t;
 
-// Create a ttl hash
-ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init);
+// Open a set scan cursor 
+sscan_cursor_t open_sscan_cursor(const sscan_cursor_init_t *init);
 
-// Destroy a ttl hash
-void destroy_ttl_hash(ttl_hash_t hash);
+// Check for error
+const char *sscan_error(sscan_cursor_t cursor, size_t *len);
 
-// Test for a key in the hash, optionally returning a dup of its value
-int ttl_hash_get(ttl_hash_t hash, size_t key, char **value);
+// Return next string of the cursor
+const char *sscan_next_element(sscan_cursor_t cursor, size_t *len);
 
-// Set a key/value in the hash with the value valid for ttl seconds
-int ttl_hash_set(ttl_hash_t hash, size_t key, const char *value);
+// Close a set scan cursor
+void close_sscan_cursor(sscan_cursor_t cursor);
 
-#endif /* TTL_HASH_H */
+#endif /* SSCAN_CURSOR_H */

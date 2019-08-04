@@ -29,6 +29,8 @@
 
 #include "jobcomp_cmd.h"
 
+#include "src/redis/common/sscan_cursor.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -68,6 +70,7 @@ static int days_since_unix_epoch(const char *iso8601_date, long long *days,
     return REDISMODULE_OK;
 }
 
+#if 0
 struct job_criteria {
     const char *keytag;
     const char *uuid;
@@ -90,6 +93,7 @@ static int accept_job(RedisModuleCtx *ctx, const job_criteria_t *criteria,
 {
     return 1;
 }
+#endif
 
 static int create_match_set(RedisModuleCtx *ctx, long long start_time,
                             long long end_time, const char *keytag,
@@ -102,74 +106,46 @@ static int create_match_set(RedisModuleCtx *ctx, long long start_time,
     long long day = start_day;
     for (; day <= end_day; ++day) {
 
-        // The current index we will inspect for jobs
-        RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
-            "%s:idx:%ld:end", keytag, day);
+        sscan_cursor_init_t init = {
+            .ctx = ctx,
+            .set = RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:end",
+                keytag, day),
+            .count = 100
+        };
+        const char *element, *err;
+        size_t element_sz, err_sz;
 
-        long long cursor = 0;
+        sscan_cursor_t cursor = open_sscan_cursor(&init);
+        err = sscan_error(cursor, &err_sz);
+        if (err) {
+            RedisModule_ReplyWithError(ctx, err);
+            close_sscan_cursor(cursor);
+            return REDISMODULE_ERR;
+        }
         do {
-            RedisModuleCallReply *reply = NULL;
-            RedisModuleCallReply *subreply_cursor = NULL;
-            RedisModuleCallReply *subreply_job_array = NULL;
-
-            // Open a redis cursor for this index
-            reply = RedisModule_Call(ctx, "SSCAN","slcl", idx, cursor, "COUNT",
-                100);
-            if ((RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_ARRAY) ||
-                (RedisModule_CallReplyLength(reply) != 2)) {
-                RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
+            element = sscan_next_element(cursor, &element_sz);
+            err = sscan_error(cursor, &err_sz);
+            if (err) {
+                RedisModule_ReplyWithError(ctx, err);
+                close_sscan_cursor(cursor);
                 return REDISMODULE_ERR;
             }
-
-            subreply_cursor = RedisModule_CallReplyArrayElement(reply, 0);
-            if ((RedisModule_CallReplyType(subreply_cursor)
-                != REDISMODULE_REPLY_STRING)) {
-                RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
-                return REDISMODULE_ERR;
-            }
-            subreply_job_array = RedisModule_CallReplyArrayElement(reply, 1);
-            if (!subreply_job_array) {
-                // Empty or non-existent index
-                continue;
-            }
-            if ((RedisModule_CallReplyType(subreply_job_array)
-                != REDISMODULE_REPLY_ARRAY)) {
-                RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
-                return REDISMODULE_ERR;
-            }
-
-            // Cursor value for next loop
-            cursor = strtoll(RedisModule_CallReplyStringPtr(subreply_cursor,
-                NULL), NULL, 10);
-            if ((errno == ERANGE &&
-                    (cursor == LLONG_MAX || cursor == LLONG_MIN))
-                || (errno != 0 && cursor == 0)) {
-                RedisModule_ReplyWithError(ctx, "invalid cursor");
-                return REDISMODULE_ERR;
-            }
-
-            // Fetch each job id
-            size_t j = 0;
-            for (; j < RedisModule_CallReplyLength(subreply_job_array); ++j) {
-                RedisModuleCallReply *subreply_job =
-                    RedisModule_CallReplyArrayElement(subreply_job_array, j);
-                if (!subreply_job) {
-                    continue;
-                }
-                long long job = strtoll(RedisModule_CallReplyStringPtr(
-                    subreply_job, NULL), NULL, 10);
+            if (element) {
+                long long job = strtoll(element, NULL, 10);
                 if ((errno == ERANGE &&
-                        (cursor == LLONG_MAX || cursor == LLONG_MIN))
-                    || (errno != 0 && cursor == 0)) {
+                        (job == LLONG_MAX || job == LLONG_MIN))
+                    || (errno != 0 && job == 0)) {
                     RedisModule_ReplyWithError(ctx, "invalid job id");
+                    close_sscan_cursor(cursor);
                     return REDISMODULE_ERR;
                 }
 
-                if (accept_job(ctx, job, start_time, end_time, keytag, uuid)) {
+                //if (accept_job(ctx, job, start_time, end_time, keytag, uuid)) {
                     RedisModule_Call(ctx, "SADD", "cl", "tmp", job);
-                }
+                //}
             }
-        } while (cursor);
+        } while (element);
+        close_sscan_cursor(cursor);
     }
 
     return REDISMODULE_OK;
