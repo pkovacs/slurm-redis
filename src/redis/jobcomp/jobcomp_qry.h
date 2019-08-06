@@ -41,6 +41,8 @@ typedef struct {
     RedisModuleCtx *ctx;
     const char *keytag;
     const char *uuid;
+    long long start_time;
+    long long end_time;
 } job_query_init_t;
 
 // Create a job query

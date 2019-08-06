@@ -108,7 +108,7 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return REDISMODULE_ERR;
     }
     RedisModuleString *idx_end = RedisModule_CreateStringPrintf(ctx,
-        "%s:idx:%ld:end", keytag, end_days);
+        "%s:idx:%lld:end", keytag, end_days);
     reply = RedisModule_Call(ctx, "SADD", "sc", idx_end, jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
@@ -132,12 +132,6 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_CreateStringPrintf(ctx, "%s:qry:%s", keytag, uuid);
     RedisModuleString *match =
         RedisModule_CreateStringPrintf(ctx, "%s:mat:%s", keytag, uuid);
-
-    job_query_init_t init = {
-        .keytag = keytag,
-        .uuid = uuid
-    };
-    AUTO_PTR(destroy_job_query) job_query_t qry = create_job_query(&init);
 
     // Open the main query key
     RedisModuleKey *key = RedisModule_OpenKey(ctx, keyname, REDISMODULE_READ);
@@ -163,13 +157,22 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithError(ctx, "invalid start time");
         return REDISMODULE_ERR;
     }
-    end_time = strtol(RedisModule_StringPtrLen(end, NULL), NULL, 10);
+    end_time = strtoll(RedisModule_StringPtrLen(end, NULL), NULL, 10);
     if ((errno == ERANGE &&
             (end_time == LLONG_MAX || end_time == LLONG_MIN))
         || (errno != 0 && end_time == 0)) {
         RedisModule_ReplyWithError(ctx, "invalid end time");
         return REDISMODULE_ERR;
     }
+
+    job_query_init_t init = {
+        .ctx = ctx,
+        .keytag = keytag,
+        .uuid = uuid,
+        .start_time = start_time,
+        .end_time = end_time
+    };
+    AUTO_PTR(destroy_job_query) job_query_t qry = create_job_query(&init);
 
     // Identify range of index keys we will inspect
     long long start_day = start_time / SECONDS_PER_DAY;
@@ -182,7 +185,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         const char *element, *err;
         size_t element_sz, err_sz;
         RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
-            "%s:idx:%ld:end", keytag, day);
+            "%s:idx:%lld:end", keytag, day);
 
         sscan_cursor_init_t init = {
             .ctx = ctx,
@@ -220,6 +223,19 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         } while (element);
         RedisModule_FreeString(ctx, idx);
         idx = NULL;
+    }
+
+    RedisModuleKey *mkey = RedisModule_OpenKey(ctx, match, REDISMODULE_WRITE);
+    if ((RedisModule_KeyType(mkey) != REDISMODULE_KEYTYPE_EMPTY) &&
+        (RedisModule_KeyType(mkey) != REDISMODULE_KEYTYPE_SET)) {
+        RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
+        return REDISMODULE_ERR;
+    }
+    if (RedisModule_KeyType(mkey) == REDISMODULE_KEYTYPE_SET &&
+            (RedisModule_SetExpire(mkey, QUERY_KEY_TTL * 1000)
+                == REDISMODULE_ERR)) {
+        RedisModule_ReplyWithError(ctx, "failed to set ttl on match set");
+        return REDISMODULE_ERR;
     }
 
     RedisModule_ReplyWithSimpleString(ctx, "OK");
