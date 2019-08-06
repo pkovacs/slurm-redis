@@ -26,8 +26,8 @@ add_library(slurm_jobcomp MODULE
     slurm_jobcomp.c
     jobcomp_cmd.c
     jobcomp_cmd.h
-    #jobcomp_qry.c
-    #jobcomp_qry.h
+    jobcomp_qry.c
+    jobcomp_qry.h
 )
 
 set_target_properties(slurm_jobcomp

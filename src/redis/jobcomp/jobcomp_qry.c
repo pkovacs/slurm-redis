@@ -30,18 +30,31 @@
 #include "jobcomp_qry.h"
 
 #include <assert.h>
+#include <time.h>
+
+typedef struct job_query {
+    time_t start_time, end_time;
+} *job_query_t;
 
 // Create a job query
 job_query_t create_job_query(const job_query_init_t *init)
 {
+    job_query_t qry = RedisModule_Calloc(1, sizeof(struct job_query));
+    return qry;
 }
 
 // Check if a job matches job query criteria
 int job_query_match_job(const job_query_t qry, long long job)
 {
+    assert(qry != NULL);
+    assert (job > 0);
+    return 0;
 }
 
 // Destroy a job query
 void destroy_job_query(job_query_t qry)
 {
+    assert (qry != NULL);
+
+    RedisModule_Free(qry);
 }

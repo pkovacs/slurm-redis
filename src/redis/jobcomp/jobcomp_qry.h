@@ -38,6 +38,9 @@ typedef struct job_query *job_query_t;
 
 // Job query initialization
 typedef struct {
+    RedisModuleCtx *ctx;
+    const char *keytag;
+    const char *uuid;
 } job_query_init_t;
 
 // Create a job query
