@@ -144,18 +144,19 @@ const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
         RedisModule_FreeString(cursor->ctx, cursor->err);
         cursor->err = NULL;
     }
-    // We are hiding the necessary repeated calls to SSCAN with this api.
-    // In order to complete a full iteration with SSCAN, it is required that
-    // we keep calling it while the cursor is non-zero.  We consume the array
-    // with each call until the SSCAN cursor value hits zero.  The returned
-    // array can legally come back NULL in which case we keep calling SSCAN
-    // until values appear on the array OR the cursor comes back zero.
-    while (cursor->cursor != 0 && cursor->subreply_array == NULL) {
+    // We are hiding the repeated calls to SSCAN.  In order to complete
+    // a full iteration with SSCAN, it is required that we keep calling
+    // SSCAN until the cursor value on reply[0] is zero. We consume the
+    // array on reply[1] with each call of SSCAN.
+    while (cursor->cursor != 0 &&
+            ((cursor->subreply_array == NULL) ||
+             (cursor->next_element >= cursor->total_elements))) {
         call_sscan_internal(cursor);
         if (cursor->err) {
             return RedisModule_StringPtrLen(cursor->err, len);
         }
     }
+    // If we have an array on the sub-reply, consume it one at a time
     if (cursor->subreply_array &&
         (cursor->next_element < cursor->total_elements)) {
         RedisModuleCallReply *subreply_element =
