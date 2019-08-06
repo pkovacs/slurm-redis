@@ -46,10 +46,10 @@ typedef struct {
 // Create a job query
 job_query_t create_job_query(const job_query_init_t *init);
 
+// Destroy a job query
+void destroy_job_query(job_query_t *qry);
+
 // Check if a job matches job query criteria
 int job_query_match_job(const job_query_t qry, long long job);
-
-// Destroy a job query
-void destroy_job_query(job_query_t qry);
 
 #endif /* JOBCOMP_QRY_H */

@@ -77,10 +77,8 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
 
 void jobcomp_redis_format_fini()
 {
-    destroy_ttl_hash(user_cache);
-    user_cache = NULL;
-    destroy_ttl_hash(group_cache);
-    group_cache = NULL;
+    destroy_ttl_hash(&user_cache);
+    destroy_ttl_hash(&group_cache);
 }
 
 int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields)

@@ -46,13 +46,13 @@ typedef struct {
 // Create a set scan cursor
 sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init);
 
+// Destroy a set scan cursor
+void destroy_sscan_cursor(sscan_cursor_t *cursor);
+
 // Check for error
 const char *sscan_error(sscan_cursor_t cursor, size_t *len);
 
 // Return next string of the cursor
 const char *sscan_next_element(sscan_cursor_t cursor, size_t *len);
-
-// Destroy a set scan cursor
-void destroy_sscan_cursor(sscan_cursor_t cursor);
 
 #endif /* SSCAN_CURSOR_H */

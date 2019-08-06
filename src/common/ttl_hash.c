@@ -75,12 +75,15 @@ ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
     return hash;
 }
 
-void destroy_ttl_hash(ttl_hash_t hash)
+void destroy_ttl_hash(ttl_hash_t *hash)
 {
-    pthread_rwlock_destroy(&hash->rwlock);
-    pthread_rwlockattr_destroy(&hash->rwlock_attr);
-    xfree(hash->buckets);
-    xfree(hash);
+    if (!hash) {
+        return;
+    }
+    pthread_rwlock_destroy(&(*hash)->rwlock);
+    pthread_rwlockattr_destroy(&(*hash)->rwlock_attr);
+    xfree((*hash)->buckets);
+    xfree((*hash));
 }
 
 int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)

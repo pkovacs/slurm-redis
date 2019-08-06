@@ -43,18 +43,20 @@ job_query_t create_job_query(const job_query_init_t *init)
     return qry;
 }
 
+// Destroy a job query
+void destroy_job_query(job_query_t *qry)
+{
+    if (!qry) {
+        return;
+    }
+    RedisModule_Free(*qry);
+    *qry = NULL;
+}
+
 // Check if a job matches job query criteria
 int job_query_match_job(const job_query_t qry, long long job)
 {
     assert(qry != NULL);
     assert (job > 0);
     return 0;
-}
-
-// Destroy a job query
-void destroy_job_query(job_query_t qry)
-{
-    assert (qry != NULL);
-
-    RedisModule_Free(qry);
 }

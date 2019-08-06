@@ -54,7 +54,7 @@ typedef struct {
 ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init);
 
 // Destroy a ttl hash
-void destroy_ttl_hash(ttl_hash_t hash);
+void destroy_ttl_hash(ttl_hash_t *hash);
 
 // Test for a key in the hash, optionally returning a dup of its value
 int ttl_hash_get(ttl_hash_t hash, size_t key, char **value);

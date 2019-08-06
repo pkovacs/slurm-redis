@@ -35,6 +35,9 @@ check_c_source_compiles("
    }
 "  HAVE_ATTRIBUTE_CLEANUP
 )
+if(NOT HAVE_ATTRIBUTE_CLEANUP)
+    message(FATAL_ERROR "compiler __attribute__ ((cleanup)) not found")
+endif()
 
 check_c_source_compiles("
    int main(__attribute__ ((unused)) int argc,
@@ -44,6 +47,3 @@ check_c_source_compiles("
    }
 "  HAVE_ATTRIBUTE_UNUSED
 )
-if(NOT HAVE_ATTRIBUTE_UNUSED)
-    message(FATAL_ERROR "compiler __attribute__ ((unused)) not found")
-endif()

@@ -121,6 +121,26 @@ sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init)
     return cursor;
 }
 
+void destroy_sscan_cursor(sscan_cursor_t *cursor)
+{
+    if (!cursor) {
+        return;
+    }
+
+    if ((*cursor)->err) {
+        RedisModule_FreeString((*cursor)->ctx, (*cursor)->err);
+        (*cursor)->err = NULL;
+    }
+    if ((*cursor)->reply) {
+        // This recursively frees the subreplies too
+        RedisModule_FreeCallReply((*cursor)->reply);
+        (*cursor)->reply = NULL;
+        (*cursor)->subreply_array = NULL;
+    }
+    RedisModule_Free(*cursor);
+    *cursor = NULL;
+}
+
 const char *sscan_error(sscan_cursor_t cursor, size_t *len)
 {
     assert(cursor != NULL);
@@ -172,22 +192,4 @@ const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
         *len = element_sz;
     }
     return element;
-}
-
-void destroy_sscan_cursor(sscan_cursor_t cursor)
-{
-    assert(cursor != NULL);
-    assert(cursor->ctx != NULL);
-
-    if (cursor->err) {
-        RedisModule_FreeString(cursor->ctx, cursor->err);
-        cursor->err = NULL;
-    }
-    if (cursor->reply) {
-        // This recursively frees the subreplies too
-        RedisModule_FreeCallReply(cursor->reply);
-        cursor->reply = NULL;
-        cursor->subreply_array = NULL;
-    }
-    RedisModule_Free(cursor);
 }

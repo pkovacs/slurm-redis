@@ -29,13 +29,14 @@
 
 #include "jobcomp_cmd.h"
 
-#include "src/redis/common/sscan_cursor.h"
-
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#include "src/redis/common/sscan_cursor.h"
+#include "jobcomp_qry.h"
 
 #define QUERY_KEY_TTL 300
 #define SECONDS_PER_DAY 86400
@@ -129,6 +130,14 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     const char *uuid = RedisModule_StringPtrLen(argv[2], NULL);
     RedisModuleString *keyname =
         RedisModule_CreateStringPrintf(ctx, "%s:qry:%s", keytag, uuid);
+    RedisModuleString *match =
+        RedisModule_CreateStringPrintf(ctx, "%s:mat:%s", keytag, uuid);
+
+    job_query_init_t init = {
+        .keytag = keytag,
+        .uuid = uuid
+    };
+    AUTO_PTR(destroy_job_query) job_query_t qry = create_job_query(&init);
 
     // Open the main query key
     RedisModuleKey *key = RedisModule_OpenKey(ctx, keyname, REDISMODULE_READ);
@@ -180,11 +189,12 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             .set = RedisModule_StringPtrLen(idx, NULL),
             .count = 500
         };
-        sscan_cursor_t cursor = create_sscan_cursor(&init);
+        AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
+            create_sscan_cursor(&init);
         err = sscan_error(cursor, &err_sz);
         if (err) {
             RedisModule_ReplyWithError(ctx, err);
-            destroy_sscan_cursor(cursor);
+            destroy_sscan_cursor(&cursor);
             return REDISMODULE_ERR;
         }
         do {
@@ -192,7 +202,6 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             err = sscan_error(cursor, &err_sz);
             if (err) {
                 RedisModule_ReplyWithError(ctx, err);
-                destroy_sscan_cursor(cursor);
                 return REDISMODULE_ERR;
             }
             if (element) {
@@ -201,17 +210,16 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                         (job == LLONG_MAX || job == LLONG_MIN))
                     || (errno != 0 && job == 0)) {
                     RedisModule_ReplyWithError(ctx, "invalid job id");
-                    destroy_sscan_cursor(cursor);
                     return REDISMODULE_ERR;
                 }
 
-                //if (accept_job(ctx, job, start_time, end_time, keytag, uuid)) {
-                    RedisModule_Call(ctx, "SADD", "cl", "tmp", job);
-                //}
+                if (job_query_match_job(qry, job)) {
+                    RedisModule_Call(ctx, "SADD", "sl", match, job);
+                }
             }
         } while (element);
-        destroy_sscan_cursor(cursor);
         RedisModule_FreeString(ctx, idx);
+        idx = NULL;
     }
 
     RedisModule_ReplyWithSimpleString(ctx, "OK");
