@@ -37,10 +37,10 @@
 
 typedef struct sscan_cursor {
     RedisModuleCtx *ctx;
-    RedisModuleString *set;
     RedisModuleString *err;
     RedisModuleCallReply *reply;
     RedisModuleCallReply *subreply_array;
+    const char *set;
     long long count;
     long long cursor;
     size_t next_element;
@@ -59,7 +59,7 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     cursor->total_elements = 0;
 
     // Call SSCAN
-    cursor->reply = RedisModule_Call(cursor->ctx, "SSCAN", "slcl", cursor->set,
+    cursor->reply = RedisModule_Call(cursor->ctx, "SSCAN", "clcl", cursor->set,
         cursor->cursor, "COUNT", cursor->count);
 
     if ((RedisModule_CallReplyType(cursor->reply) != REDISMODULE_REPLY_ARRAY) ||
@@ -182,10 +182,6 @@ void destroy_sscan_cursor(sscan_cursor_t cursor)
     if (cursor->err) {
         RedisModule_FreeString(cursor->ctx, cursor->err);
         cursor->err = NULL;
-    }
-    if (cursor->set) {
-        RedisModule_FreeString(cursor->ctx, cursor->set);
-        cursor->set = NULL;
     }
     if (cursor->reply) {
         // This recursively frees the subreplies too

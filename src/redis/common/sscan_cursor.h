@@ -39,7 +39,7 @@ typedef struct sscan_cursor *sscan_cursor_t;
 // Set scan cursor initialization
 typedef struct {
     RedisModuleCtx *ctx;
-    RedisModuleString *set;
+    const char *set;
     long long count;
 } sscan_cursor_init_t;
 

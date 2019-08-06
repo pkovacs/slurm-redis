@@ -169,15 +169,17 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     // Inspect each index for jobs that match
     for (; day <= end_day; ++day) {
-        sscan_cursor_init_t init = {
-            .ctx = ctx,
-            .set = RedisModule_CreateStringPrintf(ctx, "%s:idx:%ld:end",
-                keytag, day),
-            .count = 500
-        };
+
         const char *element, *err;
         size_t element_sz, err_sz;
+        RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
+            "%s:idx:%ld:end", keytag, day);
 
+        sscan_cursor_init_t init = {
+            .ctx = ctx,
+            .set = RedisModule_StringPtrLen(idx, NULL),
+            .count = 500
+        };
         sscan_cursor_t cursor = create_sscan_cursor(&init);
         err = sscan_error(cursor, &err_sz);
         if (err) {
@@ -209,6 +211,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             }
         } while (element);
         destroy_sscan_cursor(cursor);
+        RedisModule_FreeString(ctx, idx);
     }
 
     RedisModule_ReplyWithSimpleString(ctx, "OK");
