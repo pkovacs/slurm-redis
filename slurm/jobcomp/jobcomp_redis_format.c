@@ -33,7 +33,7 @@
 #include <string.h>
 #include <time.h>
 
-#include <src/common/uid.h>     /* uid_to_string, ... */
+#include <src/common/uid.h> /* uid_to_string, ... */
 #include <src/common/xmalloc.h> /* xmalloc, ... */
 #include <src/common/xstring.h> /* xstrdup, ... */
 
@@ -44,19 +44,6 @@
 
 static ttl_hash_t user_cache = NULL;
 static ttl_hash_t group_cache = NULL;
-
-static void encode_time(time_t t, int k_field, redis_fields_t *fields)
-{
-    assert(fields != NULL);
-#ifdef ISO8601_DATES
-    fields->value[k_field] = xmalloc(ISO8601_SZ);
-    if (!mk_iso8601(t, fields->value[k_field])) {
-        xfree(fields->value[k_field]);
-    }
-#else
-    fields->value[k_field] = xstrdup_printf("%ld", t);
-#endif
-}
 
 void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
 {
@@ -79,7 +66,8 @@ void jobcomp_redis_format_fini()
     destroy_ttl_hash(&group_cache);
 }
 
-int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields)
+int jobcomp_redis_format_fields(const struct job_record *job,
+    redis_fields_t **fields)
 {
     assert(job != NULL);
     assert(fields != NULL);
@@ -137,8 +125,9 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         end_time = job->end_time;
     }
     (*fields)->value[kState] = xstrdup(job_state_string(job_state));
-    encode_time(start_time, kStart, *fields);
-    encode_time(end_time, kEnd, *fields);
+
+    (*fields)->value[kStart] = jobcomp_redis_format_time(start_time);
+    (*fields)->value[kEnd] = jobcomp_redis_format_time(end_time);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%ld", end_time - start_time);
@@ -169,10 +158,12 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
 
     if (job->details) {
         if (job->details->submit_time) {
-            encode_time(job->details->submit_time, kSubmit, *fields);
+            (*fields)->value[kSubmit] = jobcomp_redis_format_time(
+                job->details->submit_time);
         }
         if (job->details->begin_time) {
-            encode_time(job->details->begin_time, kEligible, *fields);
+            (*fields)->value[kEligible] = jobcomp_redis_format_time(
+                job->details->begin_time);
         }
         if (job->details->work_dir && *job->details->work_dir) {
             (*fields)->value[kWorkDir] = xstrdup(job->details->work_dir);
@@ -233,9 +224,24 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
     return SLURM_SUCCESS;
 }
 
-int jobcomp_redis_format_job(const redis_fields_t *fields, jobcomp_job_rec_t **job)
+int jobcomp_redis_format_job(const redis_fields_t *fields,
+    jobcomp_job_rec_t **job)
 {
     assert(fields != NULL);
     assert(job != NULL);
     return SLURM_SUCCESS;
+}
+
+char *jobcomp_redis_format_time(time_t t)
+{
+#ifdef ISO8601_DATES
+    char *buf = xmalloc(ISO8601_SZ);
+    if (!mk_iso8601(t, buf)) {
+        xfree(buf);
+        return NULL;
+    }
+    return buf;
+#else
+    return xstrdup_printf("%ld", t);
+#endif
 }

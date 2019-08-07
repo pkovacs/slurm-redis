@@ -30,16 +30,12 @@
 #include <string.h>
 #include <hiredis.h>
 #include <uuid.h>
-// for List, SLURM_VERSION_NUMBER, SLURM_SUCCESS, etc.
-#include <slurm/slurm.h>
-// for slurm_verbose, slurm_debug, etc.
-#include <slurm/spank.h>
-// for xmalloc, xfree
-#include <src/common/xmalloc.h>
-// for xstrdup
-#include <src/common/xstring.h>
-// for struct job_record
-#include <src/slurmctld/slurmctld.h>
+
+#include <slurm/slurm.h> /* List, SLURM_VERSION_NUMBER, ... */
+#include <slurm/spank.h> /* slurm_verbose, ... */
+#include <src/common/xmalloc.h> /* xmalloc, ... */
+#include <src/common/xstring.h> /* xstrdup, ... */
+#include <src/slurmctld/slurmctld.h> /* struct job_record */
 
 #include "jobcomp_redis_format.h"
 
@@ -277,11 +273,15 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     uuid_unparse(uuid, uuid_s);
 
     // Create redis hash set for the scalar condition values
-    redisAppendCommand(ctx, "HSET %s:qry:%s Start %ld End %ld", keytag,
-        uuid_s, job_cond->usage_start, job_cond->usage_end);
+    char *start = jobcomp_redis_format_time(job_cond->usage_start);
+    char *end = jobcomp_redis_format_time(job_cond->usage_end);
+    redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", keytag,
+        uuid_s, start, end);
     redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", keytag, uuid_s,
         QUERY_KEY_TTL);
     pipeline += 2;
+    xfree(start);
+    xfree(end);
 
     // Create redis set for userid_list
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {

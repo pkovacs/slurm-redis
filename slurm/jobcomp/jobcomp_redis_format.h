@@ -30,7 +30,7 @@
 #include <time.h>
 
 #include <src/common/slurm_jobcomp.h> /* jobcomp_job_rec_t */
-#include <src/slurmctld/slurmctld.h>  /* struct job_record */
+#include <src/slurmctld/slurmctld.h> /* struct job_record */
 
 /*
  * From slurm/src/common/slurm_jobcomp.h: the jobcomp_job_rec_t below
@@ -109,9 +109,14 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init);
 void jobcomp_redis_format_fini();
 
 // Format redis fields from a struct job_record (slurm to redis)
-int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **fields);
+int jobcomp_redis_format_fields(const struct job_record *job,
+    redis_fields_t **fields);
 
 // Format a jobcomp_job_rec_t from redis fields (redis to slurm)
-int jobcomp_redis_format_job(const redis_fields_t *fields, jobcomp_job_rec_t **job);
+int jobcomp_redis_format_job(const redis_fields_t *fields,
+    jobcomp_job_rec_t **job);
+
+// Format time_t into string (-DISO8601_DATES=ON/OFF option)
+char *jobcomp_redis_format_time(time_t t);
 
 #endif /* JOBCOMP_REDIS_FORMAT_H */
