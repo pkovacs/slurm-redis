@@ -25,25 +25,28 @@
 include(CheckCSourceCompiles)
 
 check_c_source_compiles("
-   void free_buffer(char **p)
+   void foo(char **p)
    {}
 
    int main(void)
    {
-     __attribute__ ((cleanup(free_buffer))) char *p = 0;
+     __attribute__((cleanup(foo))) char *p = 0;
      return 0;
    }
 "  HAVE_ATTRIBUTE_CLEANUP
 )
 if(NOT HAVE_ATTRIBUTE_CLEANUP)
-    message(FATAL_ERROR "compiler __attribute__ ((cleanup)) not found")
+    message(FATAL_ERROR "compiler __attribute__((cleanup)) not found")
 endif()
 
 check_c_source_compiles("
-   int main(__attribute__ ((unused)) int argc,
-            __attribute__ ((unused)) char **argv)
+   int main(__attribute__((unused)) int argc,
+            __attribute__((unused)) char **argv)
    {
      return 0;
    }
 "  HAVE_ATTRIBUTE_UNUSED
 )
+if(NOT HAVE_ATTRIBUTE_UNUSED)
+    message(FATAL_ERROR "compiler __attribute__((unused)) not found")
+endif()
