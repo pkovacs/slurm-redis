@@ -37,6 +37,8 @@
 #cmakedefine HAVE_ATTRIBUTE_CLEANUP
 #cmakedefine HAVE_ATTRIBUTE_UNUSED
 
+#cmakedefine ISO8601_DATES
+
 #define AUTO_PTR(fn) __attribute__((cleanup(fn)))
 
 #endif /* CONFIG_H */

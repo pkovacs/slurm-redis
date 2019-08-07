@@ -66,7 +66,7 @@ set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g ${LOCAL_C_FLAGS_RELEASE}")
 set(CMAKE_C_FLAGS_MINSIZEREL "-Os ${LOCAL_C_FLAGS_RELEASE}")
 
 if(NOT CMAKE_BUILD_TYPE)
-    set (CMAKE_BUILD_TYPE "RelWithDebInfo")
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
 if(NOT SLURM_SOURCE_DIR)
@@ -77,6 +77,8 @@ if(NOT EXISTS ${SLURM_SOURCE_DIR})
     message(FATAL_ERROR "Slurm source dir (${SLURM_SOURCE_DIR}) not found")
 endif()
 message(STATUS "Found Slurm source dir at ${SLURM_SOURCE_DIR}")
+
+option(ISO8601_DATES "Store ISO8601 dates in redis" ON)
 
 # --------------
 # Build config.h
