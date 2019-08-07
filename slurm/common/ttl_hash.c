@@ -29,14 +29,14 @@
 
 #include "ttl_hash.h"
 
-#define _XOPEN_SOURCE 600
+#define _XOPEN_SOURCE 600 /* pthread_rwlockattr_setkind_np */
 #include <pthread.h>
 #include <assert.h>
 #include <string.h>
 #include <time.h>
 
-#include <src/common/xmalloc.h>
-#include <src/common/xstring.h>
+#include <src/common/xmalloc.h> /* xmalloc, ... */
+#include <src/common/xstring.h> /* xstrdup, ... */
 
 #define TTL_HASH_VALUE_SZ 32
 
@@ -76,6 +76,7 @@ ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
     hash->hash_sz = init->hash_sz;
     hash->hash_ttl = init->hash_ttl;
     pthread_rwlockattr_init(&hash->rwlock_attr);
+    // Avoid writer starvation; requires no recursive read locking
     pthread_rwlockattr_setkind_np(&hash->rwlock_attr,
         PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
     pthread_rwlock_init(&hash->rwlock, &hash->rwlock_attr);

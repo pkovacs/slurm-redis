@@ -33,7 +33,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <string.h>
 
 typedef struct sscan_cursor {
     RedisModuleCtx *ctx;
@@ -64,9 +63,8 @@ static void call_sscan_internal(sscan_cursor_t cursor)
 
     if ((RedisModule_CallReplyType(cursor->reply) != REDISMODULE_REPLY_ARRAY) ||
         (RedisModule_CallReplyLength(cursor->reply) != 2)) {
-        cursor->err = RedisModule_CreateString(cursor->ctx,
-            REDISMODULE_ERRORMSG_WRONGTYPE,
-            strlen(REDISMODULE_ERRORMSG_WRONGTYPE));
+        cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
+            REDISMODULE_ERRORMSG_WRONGTYPE);
         return;
     }
 
@@ -126,7 +124,6 @@ void destroy_sscan_cursor(sscan_cursor_t *cursor)
     if (!cursor) {
         return;
     }
-
     if ((*cursor)->err) {
         RedisModule_FreeString((*cursor)->ctx, (*cursor)->err);
         (*cursor)->err = NULL;
@@ -145,7 +142,6 @@ const char *sscan_error(sscan_cursor_t cursor, size_t *len)
 {
     assert(cursor != NULL);
     assert(cursor->ctx != NULL);
-
     if (cursor->err) {
         return RedisModule_StringPtrLen(cursor->err, len);
     }
@@ -167,7 +163,7 @@ const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
     // We are hiding the repeated calls to SSCAN.  In order to complete
     // a full iteration with SSCAN, it is required that we keep calling
     // SSCAN until the cursor value on reply[0] is zero. We consume the
-    // array on reply[1] with each call of SSCAN.
+    // array on reply[1] one at a time with each sscan_next_element.
     while (cursor->cursor != 0 &&
             ((cursor->subreply_array == NULL) ||
              (cursor->next_element >= cursor->total_elements))) {

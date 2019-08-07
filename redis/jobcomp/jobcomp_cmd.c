@@ -42,7 +42,7 @@
 #define SECONDS_PER_DAY 86400
 
 static int days_since_unix_epoch(const char *iso8601_date, long long *days,
-                                 long long *residual_seconds)
+    long long *residual_seconds)
 {
     int y, M, d, h, m, s;
     if (sscanf(iso8601_date, "%d-%d-%dT%d:%d:%d", &y, &M, &d, &h, &m, &s)
