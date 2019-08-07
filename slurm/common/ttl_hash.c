@@ -41,7 +41,7 @@
 #define TTL_HASH_VALUE_SZ 32
 
 typedef struct ttl_hash_bucket {
-    size_t ttl;
+    time_t expiry;
     size_t key;
     char value[TTL_HASH_VALUE_SZ];
 } *ttl_hash_bucket_t;
@@ -103,7 +103,7 @@ int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
     if (hash->buckets[bkt].key != key) {
         return HASH_NOT_FOUND;
     }
-    if ((hash->buckets[bkt].ttl + hash->hash_ttl) < (size_t)time(NULL)) {
+    if (difftime(hash->buckets[bkt].expiry, time(NULL)) < 0) {
         return HASH_EXPIRED;
     }
     if (value) {
@@ -126,6 +126,6 @@ int ttl_hash_set(ttl_hash_t hash, size_t key, const char *value)
         strncpy(hash->buckets[bkt].value, value,
                 sizeof(hash->buckets[bkt].value)-1);
     }
-    hash->buckets[bkt].ttl = hash->hash_ttl + (size_t)time(NULL);
+    hash->buckets[bkt].expiry = hash->hash_ttl + time(NULL);
     return HASH_OK;
 }
