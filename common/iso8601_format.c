@@ -37,10 +37,9 @@ char *mk_iso8601(time_t t, char *iso8601)
     if (!iso8601 || t < (time_t)0) {
         return NULL;
     }
-    const size_t iso8601_sz = 21;
     struct tm tm_s;
     if (!gmtime_r(&t, &tm_s) ||
-        !strftime(iso8601, iso8601_sz, "%FT%TZ", &tm_s)) {
+            strftime(iso8601, ISO8601_SZ, "%FT%TZ", &tm_s) != ISO8601_SZ-1) {
         return NULL;
     }
     return iso8601;

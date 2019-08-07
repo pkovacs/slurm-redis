@@ -28,10 +28,9 @@
 
 #include <stdint.h>
 #include <time.h>
-// for jobcomp_job_rec_t record
-#include <src/common/slurm_jobcomp.h>
-// for struct job_record
-#include <src/slurmctld/slurmctld.h>
+
+#include <src/common/slurm_jobcomp.h> /* jobcomp_job_rec_t */
+#include <src/slurmctld/slurmctld.h>  /* struct job_record */
 
 /*
  * From slurm/src/common/slurm_jobcomp.h: the jobcomp_job_rec_t below

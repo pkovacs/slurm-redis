@@ -32,32 +32,30 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
-// for uid_to_string, gid_to_string
-#include <src/common/uid.h>
-// for xmalloc, xfree
-#include <src/common/xmalloc.h>
-// for xstrdup
-#include <src/common/xstring.h>
 
+#include <src/common/uid.h>     /* uid_to_string, ... */
+#include <src/common/xmalloc.h> /* xmalloc, ... */
+#include <src/common/xstring.h> /* xstrdup, ... */
+
+#ifdef ISO8601_DATES
+#include "common/iso8601_format.h"
+#endif
 #include "slurm/common/ttl_hash.h"
 
 static ttl_hash_t user_cache = NULL;
 static ttl_hash_t group_cache = NULL;
 
-void format_iso8601(time_t t, char **out)
+static void encode_time(time_t t, int k_field, redis_fields_t *fields)
 {
-    if (!out) {
-        return;
+    assert(fields != NULL);
+#ifdef ISO8601_DATES
+    fields->value[k_field] = xmalloc(ISO8601_SZ);
+    if (!mk_iso8601(t, fields->value[k_field])) {
+        xfree(fields->value[k_field]);
     }
-    if (t <= (time_t)0) {
-        *out = xstrdup("Unknown");
-    }
-    const size_t iso8601_sz = 20;
-    struct tm stm;
-    gmtime_r(&t, &stm);
-    *out = xmalloc(iso8601_sz);
-    memset(*out, 0, iso8601_sz);
-    strftime(*out, iso8601_sz, "%FT%T", &stm);
+#else
+    fields->value[k_field] = xstrdup_printf("%ld", t);
+#endif
 }
 
 void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
@@ -139,8 +137,8 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
         end_time = job->end_time;
     }
     (*fields)->value[kState] = xstrdup(job_state_string(job_state));
-    format_iso8601(start_time, &(*fields)->value[kStart]);
-    format_iso8601(end_time, &(*fields)->value[kEnd]);
+    encode_time(start_time, kStart, *fields);
+    encode_time(end_time, kEnd, *fields);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%ld", end_time - start_time);
@@ -171,10 +169,10 @@ int jobcomp_redis_format_fields(const struct job_record *job, redis_fields_t **f
 
     if (job->details) {
         if (job->details->submit_time) {
-            format_iso8601(job->details->submit_time, &(*fields)->value[kSubmit]);
+            encode_time(job->details->submit_time, kSubmit, *fields);
         }
         if (job->details->begin_time) {
-            format_iso8601(job->details->begin_time, &(*fields)->value[kEligible]);
+            encode_time(job->details->begin_time, kEligible, *fields);
         }
         if (job->details->work_dir && *job->details->work_dir) {
             (*fields)->value[kWorkDir] = xstrdup(job->details->work_dir);

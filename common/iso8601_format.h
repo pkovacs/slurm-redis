@@ -28,6 +28,8 @@
 
 #include <time.h>
 
+#define ISO8601_SZ 21
+
 /*
  * ISO8601 date conversion using only user-supplied buffers since
  * the slurm and redis modules use different memory allocators
