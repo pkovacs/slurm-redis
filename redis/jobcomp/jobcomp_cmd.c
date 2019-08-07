@@ -35,41 +35,12 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "common/iso8601_format.h"
 #include "redis/common/sscan_cursor.h"
 #include "jobcomp_qry.h"
 
 #define QUERY_KEY_TTL 300
 #define SECONDS_PER_DAY 86400
-
-static int days_since_unix_epoch(const char *iso8601_date, long long *days,
-    long long *residual_seconds)
-{
-    int y, M, d, h, m, s;
-    if (sscanf(iso8601_date, "%d-%d-%dT%d:%d:%d", &y, &M, &d, &h, &m, &s)
-        != 6) {
-        return REDISMODULE_ERR;
-    }
-    struct tm tm_date = {
-        .tm_year = y - 1900,
-        .tm_mon = M - 1,
-        .tm_mday = d,
-        .tm_hour = h,
-        .tm_min = m,
-        .tm_sec = s,
-        .tm_isdst = -1
-    };
-    time_t start_time = timegm(&tm_date);
-    if (start_time < 0) {
-        return REDISMODULE_ERR;
-    }
-    if (days) {
-        *days = start_time / SECONDS_PER_DAY;
-    }
-    if (residual_seconds) {
-        *residual_seconds = start_time % SECONDS_PER_DAY;
-    }
-    return REDISMODULE_OK;
-}
 
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
@@ -80,9 +51,10 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     const char *keytag = RedisModule_StringPtrLen(argv[1], NULL);
     const char *jobid = RedisModule_StringPtrLen(argv[2], NULL);
-    RedisModuleString *keyname =
-        RedisModule_CreateStringPrintf(ctx, "%s:%s", keytag, jobid);
+    RedisModuleString *keyname = RedisModule_CreateStringPrintf(ctx,
+        "%s:%s", keytag, jobid);
     RedisModuleCallReply *reply = NULL;
+    long long end_time;
 
     // Open the job key
     RedisModuleKey *key = RedisModule_OpenKey(ctx, keyname, REDISMODULE_READ);
@@ -100,13 +72,24 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return REDISMODULE_ERR;
     }
 
-    // Create or update the end index
-    long long end_days = 0;
-    if (days_since_unix_epoch(RedisModule_StringPtrLen(end, NULL), &end_days,
-        NULL) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(ctx, "failed to parse end date");
+#ifdef ISO8601_DATES
+    end_time = mk_time(RedisModule_StringPtrLen(end, NULL));
+    if (end_time == (-1)) {
+        RedisModule_ReplyWithError(ctx, "invalid iso8601 end date/time");
         return REDISMODULE_ERR;
     }
+#else
+    end_time = strtoll(RedisModule_StringPtrLen(end, NULL), NULL, 10);
+    if ((errno == ERANGE &&
+            (end_time == LLONG_MAX || end_time == LLONG_MIN))
+        || (errno != 0 && end_time == 0)) {
+        RedisModule_ReplyWithError(ctx, "invalid end date/time");
+        return REDISMODULE_ERR;
+    }
+#endif
+
+    // Create or update the end index
+    long long end_days = end_time / SECONDS_PER_DAY;
     RedisModuleString *idx_end = RedisModule_CreateStringPrintf(ctx,
         "%s:idx:%lld:end", keytag, end_days);
     reply = RedisModule_Call(ctx, "SADD", "sc", idx_end, jobid);
