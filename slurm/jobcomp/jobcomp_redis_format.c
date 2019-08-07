@@ -39,7 +39,7 @@
 // for xstrdup
 #include <src/common/xstring.h>
 
-#include "src/common/ttl_hash.h"
+#include "slurm/common/ttl_hash.h"
 
 static ttl_hash_t user_cache = NULL;
 static ttl_hash_t group_cache = NULL;

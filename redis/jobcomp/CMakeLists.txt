@@ -22,17 +22,28 @@
 # SOFTWARE.
 #
 
-add_library(common OBJECT
-    ttl_hash.c
-    ttl_hash.h
+add_library(slurm_jobcomp MODULE
+    slurm_jobcomp.c
+    jobcomp_cmd.c
+    jobcomp_cmd.h
+    jobcomp_qry.c
+    jobcomp_qry.h
 )
 
-# Object libraries are not PIC by default
-set_target_properties(common
+set_target_properties(slurm_jobcomp
     PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
+    OUTPUT_NAME "slurm_jobcomp"
+    PREFIX ""
 )
 
-target_include_directories(common
-    PRIVATE ${SLURM_SOURCE_DIR}
+target_include_directories(slurm_jobcomp
+    PRIVATE ${REDIS_INCLUDE_DIRS}
 )
+
+target_link_libraries(slurm_jobcomp
+    PRIVATE $<TARGET_OBJECTS:redis_common>
+)
+
+install(TARGETS
+    slurm_jobcomp
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/slurm/redis)

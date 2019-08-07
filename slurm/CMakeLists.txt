@@ -22,17 +22,5 @@
 # SOFTWARE.
 #
 
-add_library(common_redis OBJECT
-    sscan_cursor.c
-    sscan_cursor.h
-)
-
-# Object libraries are not PIC by default
-set_target_properties(common_redis
-    PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-)
-
-target_include_directories(common_redis
-    PRIVATE ${REDIS_INCLUDE_DIRS}
-)
+add_subdirectory(common)
+add_subdirectory(jobcomp)

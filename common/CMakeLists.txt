@@ -22,37 +22,13 @@
 # SOFTWARE.
 #
 
-add_library(jobcomp_redis MODULE
-    jobcomp_redis.c
-    jobcomp_redis_format.c
-    jobcomp_redis_format.h
+add_library(common OBJECT
+    iso8601_format.c
+    iso8601_format.h
 )
 
-set_target_properties(jobcomp_redis
+# Object libraries are not PIC by default
+set_target_properties(common
     PROPERTIES
-    OUTPUT_NAME "jobcomp_redis"
-    PREFIX ""
+    POSITION_INDEPENDENT_CODE ON
 )
-
-target_compile_options(jobcomp_redis
-    PRIVATE ${HIREDIS_CFLAGS_OTHER}
-    PRIVATE ${UUID_CFLAGS_OTHER}
-)
-
-target_include_directories(jobcomp_redis
-    PRIVATE ${HIREDIS_INCLUDE_DIRS}
-    PRIVATE ${UUID_INCLUDE_DIRS}
-    PRIVATE ${SLURM_SOURCE_DIR}
-)
-
-target_link_libraries(jobcomp_redis
-    PRIVATE $<TARGET_OBJECTS:common>
-    PRIVATE ${HIREDIS_LIBRARIES}
-    PRIVATE ${UUID_LIBRARIES}
-    PRIVATE ${SLURM_LIBRARIES}
-    Threads::Threads
-)
-
-install(TARGETS
-    jobcomp_redis
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/slurm)

@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "src/redis/common/sscan_cursor.h"
+#include "redis/common/sscan_cursor.h"
 #include "jobcomp_qry.h"
 
 #define QUERY_KEY_TTL 300

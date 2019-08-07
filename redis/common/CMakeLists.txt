@@ -22,6 +22,17 @@
 # SOFTWARE.
 #
 
-add_subdirectory(common)
-add_subdirectory(plugins)
-add_subdirectory(redis)
+add_library(redis_common OBJECT
+    sscan_cursor.c
+    sscan_cursor.h
+)
+
+# Object libraries are not PIC by default
+set_target_properties(redis_common
+    PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+target_include_directories(redis_common
+    PRIVATE ${REDIS_INCLUDE_DIRS}
+)
