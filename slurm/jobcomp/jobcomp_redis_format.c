@@ -130,7 +130,8 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     (*fields)->value[kEnd] = jobcomp_redis_format_time(end_time);
 
     memset(buf, 0, sizeof(buf));
-    snprintf(buf, sizeof(buf)-1, "%ld", end_time - start_time);
+    snprintf(buf, sizeof(buf)-1, "%ld",
+        (long int)difftime(end_time, start_time));
     (*fields)->value[kElapsed] = xstrdup(buf);
 
     (*fields)->value[kPartition] = xstrdup(job->partition);
@@ -242,6 +243,9 @@ char *jobcomp_redis_format_time(time_t t)
     }
     return buf;
 #else
-    return xstrdup_printf("%ld", t);
+    char buf[64];
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%ld", t);
+    return xstrdup(buf);
 #endif
 }
