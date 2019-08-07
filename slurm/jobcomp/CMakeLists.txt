@@ -51,6 +51,7 @@ target_link_libraries(jobcomp_redis
     PRIVATE ${HIREDIS_LIBRARIES}
     PRIVATE ${UUID_LIBRARIES}
     PRIVATE ${SLURM_LIBRARIES}
+    Threads::Threads
 )
 
 install(TARGETS

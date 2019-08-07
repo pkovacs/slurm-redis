@@ -36,8 +36,3 @@ set_target_properties(slurm_common
 target_include_directories(slurm_common
     PRIVATE ${SLURM_SOURCE_DIR}
 )
-
-target_link_libraries(slurm_common
-    PRIVATE ${SLURM_LIBRARIES}
-    Threads::Threads
-)
