@@ -42,6 +42,7 @@ target_include_directories(slurm_jobcomp
 
 target_link_libraries(slurm_jobcomp
     PRIVATE $<TARGET_OBJECTS:redis_common>
+    PRIVATE $<TARGET_OBJECTS:common>
 )
 
 install(TARGETS

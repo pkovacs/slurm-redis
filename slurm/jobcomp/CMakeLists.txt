@@ -47,6 +47,7 @@ target_include_directories(jobcomp_redis
 
 target_link_libraries(jobcomp_redis
     PRIVATE $<TARGET_OBJECTS:slurm_common>
+    PRIVATE $<TARGET_OBJECTS:common>
     PRIVATE ${HIREDIS_LIBRARIES}
     PRIVATE ${UUID_LIBRARIES}
     PRIVATE ${SLURM_LIBRARIES}

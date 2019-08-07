@@ -61,6 +61,13 @@ static size_t hasher(size_t x) {
     return x;
 }
 
+static void unlock_rwlock(pthread_rwlock_t **rwlock)
+{
+    if (*rwlock) {
+        pthread_rwlock_unlock(*rwlock);
+    }
+}
+
 ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
 {
     assert(init != NULL);
@@ -88,34 +95,28 @@ void destroy_ttl_hash(ttl_hash_t *hash)
 
 int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
 {
-    int rc = HASH_OK;
+    AUTO_PTR(unlock_rwlock) pthread_rwlock_t *lock = &hash->rwlock;
     if (pthread_rwlock_rdlock(&hash->rwlock)) {
-        rc = HASH_BUSY;
-        goto final;
+        return HASH_BUSY;
     }
     size_t bkt = hasher(key) % hash->hash_sz;
     if (hash->buckets[bkt].key != key) {
-        rc = HASH_NOT_FOUND;
-        goto final;
+        return HASH_NOT_FOUND;
     }
     if ((hash->buckets[bkt].ttl + hash->hash_ttl) < (size_t)time(NULL)) {
-        rc = HASH_EXPIRED;
-        goto final;
+        return HASH_EXPIRED;
     }
     if (value) {
         *value = xstrdup(hash->buckets[bkt].value);
     }
-final:
-    pthread_rwlock_unlock(&hash->rwlock);
-    return rc;
+    return HASH_OK;
 }
 
 int ttl_hash_set(ttl_hash_t hash, size_t key, const char *value)
 {
-    int rc = HASH_OK;
+    AUTO_PTR(unlock_rwlock) pthread_rwlock_t *lock = &hash->rwlock;
     if (pthread_rwlock_wrlock(&hash->rwlock)) {
-        rc = HASH_BUSY;
-        goto final;
+        return HASH_BUSY;
     }
     size_t bkt = hasher(key) % hash->hash_sz;
     hash->buckets[bkt].key = key;
@@ -126,7 +127,5 @@ int ttl_hash_set(ttl_hash_t hash, size_t key, const char *value)
                 sizeof(hash->buckets[bkt].value)-1);
     }
     hash->buckets[bkt].ttl = hash->hash_ttl + (size_t)time(NULL);
-final:
-    pthread_rwlock_unlock(&hash->rwlock);
-    return rc;
+    return HASH_OK;
 }
