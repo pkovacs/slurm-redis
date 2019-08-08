@@ -41,8 +41,6 @@ typedef struct {
     RedisModuleCtx *ctx;
     const char *keytag;
     const char *uuid;
-    long long start_time;
-    long long end_time;
 } job_query_init_t;
 
 // Create a job query
@@ -53,5 +51,11 @@ void destroy_job_query(job_query_t *qry);
 
 // Check if a job matches job query criteria
 int job_query_match_job(const job_query_t qry, long long job);
+
+// Return integer start day for query
+long long job_query_start_day(const job_query_t qry);
+
+// Return integer end day for query
+long long job_query_end_day(const job_query_t qry);
 
 #endif /* JOBCOMP_QRY_H */

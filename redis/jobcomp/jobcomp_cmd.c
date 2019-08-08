@@ -39,9 +39,6 @@
 #include "redis/common/sscan_cursor.h"
 #include "jobcomp_qry.h"
 
-#define QUERY_KEY_TTL 300
-#define SECONDS_PER_DAY 86400
-
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
     RedisModule_AutoMemory(ctx);
@@ -111,55 +108,22 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     const char *keytag = RedisModule_StringPtrLen(argv[1], NULL);
     const char *uuid = RedisModule_StringPtrLen(argv[2], NULL);
-    RedisModuleString *keyname =
-        RedisModule_CreateStringPrintf(ctx, "%s:qry:%s", keytag, uuid);
-    RedisModuleString *match =
-        RedisModule_CreateStringPrintf(ctx, "%s:mat:%s", keytag, uuid);
-
-    // Open the main query key
-    RedisModuleKey *key = RedisModule_OpenKey(ctx, keyname, REDISMODULE_READ);
-    if ((RedisModule_KeyType(key) == REDISMODULE_KEYTYPE_EMPTY) ||
-        (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_HASH)) {
-        RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
-        return REDISMODULE_ERR;
-    }
-
-    // Fetch the time range for this query
-    RedisModuleString *start = NULL, *end = NULL;
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "Start", &start,
-            "End", &end, NULL) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(ctx, "expected key(s) missing");
-        return REDISMODULE_ERR;
-    }
-
-    long long start_time, end_time;
-    start_time = strtoll(RedisModule_StringPtrLen(start, NULL), NULL, 10);
-    if ((errno == ERANGE &&
-            (start_time == LLONG_MAX || start_time == LLONG_MIN))
-        || (errno != 0 && start_time == 0)) {
-        RedisModule_ReplyWithError(ctx, "invalid start time");
-        return REDISMODULE_ERR;
-    }
-    end_time = strtoll(RedisModule_StringPtrLen(end, NULL), NULL, 10);
-    if ((errno == ERANGE &&
-            (end_time == LLONG_MAX || end_time == LLONG_MIN))
-        || (errno != 0 && end_time == 0)) {
-        RedisModule_ReplyWithError(ctx, "invalid end time");
-        return REDISMODULE_ERR;
-    }
 
     job_query_init_t init = {
         .ctx = ctx,
         .keytag = keytag,
         .uuid = uuid,
-        .start_time = start_time,
-        .end_time = end_time
     };
     AUTO_PTR(destroy_job_query) job_query_t qry = create_job_query(&init);
+    if (!qry) {
+        return REDISMODULE_ERR;
+    }
+    RedisModuleString *match = RedisModule_CreateStringPrintf(ctx,
+        "%s:mat:%s", keytag, uuid);
 
-    // Identify range of index keys we will inspect
-    long long start_day = start_time / SECONDS_PER_DAY;
-    long long end_day = end_time / SECONDS_PER_DAY;
+    // The range of index keys we will inspect
+    long long start_day = job_query_start_day(qry);
+    long long end_day = job_query_end_day(qry);
     long long day = start_day;
 
     // Inspect each index for jobs that match

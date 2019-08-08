@@ -44,8 +44,6 @@
 #define USER_CACHE_TTL 120
 #define GROUP_CACHE_TTL 120
 
-#define QUERY_KEY_TTL 300
-
 const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
 const uint32_t plugin_version = SLURM_VERSION_NUMBER;

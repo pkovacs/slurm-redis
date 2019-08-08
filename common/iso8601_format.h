@@ -29,6 +29,7 @@
 #include <time.h>
 
 #define ISO8601_SZ 21
+#define SECONDS_PER_DAY 86400
 
 /*
  * ISO8601 date conversion using only user-supplied buffers since
