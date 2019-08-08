@@ -80,6 +80,10 @@ message(STATUS "Found Slurm source dir at ${SLURM_SOURCE_DIR}")
 
 option(ISO8601_DATES "Store ISO8601 dates in redis" ON)
 
+if(NOT QUERY_KEY_TTL)
+    set(QUERY_KEY_TTL "300")
+endif()
+
 # --------------
 # Build config.h
 # --------------

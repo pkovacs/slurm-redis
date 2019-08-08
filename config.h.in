@@ -29,6 +29,8 @@
 #define SLURM_REDIS_VERSION_MINOR @SLURM_REDIS_VERSION_MINOR@
 #define SLURM_REDIS_VERSION_PATCH @SLURM_REDIS_VERSION_PATCH@
 
+#define AUTO_PTR(fn) __attribute__((cleanup(fn)))
+
 #cmakedefine HAVE_STDINT_H
 #cmakedefine HAVE_STDIO_H
 #cmakedefine HAVE_SYS_TYPES_H
@@ -38,7 +40,6 @@
 #cmakedefine HAVE_ATTRIBUTE_UNUSED
 
 #cmakedefine ISO8601_DATES
-
-#define AUTO_PTR(fn) __attribute__((cleanup(fn)))
+#cmakedefine QUERY_KEY_TTL @QUERY_KEY_TTL@
 
 #endif /* CONFIG_H */
