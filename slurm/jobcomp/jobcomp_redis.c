@@ -230,11 +230,11 @@ typedef struct {
     int32_t exitcode;   /* exit code of job */
     uint32_t flags;     /* Reporting flags*/
     List format_list;   /* list of char * */
-    List groupid_list;  /* list of char * */
-    List jobname_list;  /* list of char * */
+ *  List groupid_list;  /* list of char * */
+ *  List jobname_list;  /* list of char * */
     uint32_t nodes_max; /* number of nodes high range */
     uint32_t nodes_min; /* number of nodes low range */
-    List partition_list;/* list of char * */
+ *  List partition_list;/* list of char * */
     List qos_list;      /* list of char * */
     List resv_list;     /* list of char * */
     List resvid_list;   /* list of char * */
@@ -242,10 +242,10 @@ typedef struct {
     List step_list;     /* list of slurmdb_selected_step_t */
     uint32_t timelimit_max; /* max timelimit */
     uint32_t timelimit_min; /* min timelimit */
-    time_t usage_end;
-    time_t usage_start;
+ *  time_t usage_end;
+ *  time_t usage_start;
     char *used_nodes;   /* a ranged node string where jobs ran */
-    List userid_list;   /* list of char * */
+ *  List userid_list;   /* list of char * */
     List wckey_list;    /* list of char * */
 } slurmdb_job_cond_t;
 #endif
@@ -270,7 +270,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     uuid_generate(uuid);
     uuid_unparse(uuid, uuid_s);
 
-    // Create redis hash set for the scalar condition values
+    // Create redis hash set for the scalar criteria
     char *start = jobcomp_redis_format_time(job_cond->usage_start);
     char *end = jobcomp_redis_format_time(job_cond->usage_end);
     redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", keytag,
@@ -309,7 +309,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         pipeline += redis_sadd_list(key, job_cond->partition_list);
     }
 
-    // Ask the redis server for matches to the criteria we sent
+    // Ask the redis server for matches to the criteria
     redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", keytag, uuid_s);
     ++pipeline;
 
@@ -322,7 +322,6 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         reply = NULL;
     }
 
-    // TODO: send deletes to redis for the qry and result set
     return NULL;
 }
 
