@@ -35,7 +35,7 @@
 #include <uuid.h>
 
 #include <slurm/slurm.h> /* List, SLURM_VERSION_NUMBER, ... */
-#include <slurm/spank.h> /* slurm_verbose, ... */
+#include <slurm/spank.h> /* slurm_debug, ... */
 #include <src/common/xmalloc.h> /* xmalloc, ... */
 #include <src/common/xstring.h> /* xstrdup, ... */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
@@ -323,7 +323,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         freeReplyObject(reply);
         reply = NULL;
     }
-    slurm_debug("Redis match set: %s", set ? set : "(null)");
+    slurm_debug("redis match set: %s", set ? set : "(null)");
     if (!set) {
         return NULL;
     }
@@ -339,14 +339,12 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
         create_sscan_cursor(&init);
     if (sscan_error(cursor, &err, &err_sz) == SSCAN_ERR) {
-            slurm_debug("sscan err: %s", err);
             return NULL;
         }
         do {
             rc = sscan_next_element(cursor, &element, &element_sz);
             if (rc == SSCAN_ERR) {
                 sscan_error(cursor, &err, &err_sz);
-                slurm_debug("sscan err: %s", err);
                 return NULL;
             }
             if ((rc == SSCAN_OK) && element) {
@@ -354,7 +352,6 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
                 if ((errno == ERANGE &&
                         (job == LLONG_MAX || job == LLONG_MIN))
                     || (errno != 0 && job == 0)) {
-                    slurm_debug("invalid job id");
                     return NULL;
                 }
 
