@@ -98,7 +98,7 @@ static int redis_connected(void)
     return rc;
 }
 
-static int redis_sadd_list(const char *key, const List list) {
+static int redis_add_job_criteria(const char *key, const List list) {
     char *value;
     int pipeline = 0;
     ListIterator it = list_iterator_create(list);
@@ -110,6 +110,47 @@ static int redis_sadd_list(const char *key, const List list) {
     ++pipeline;
     list_iterator_destroy(it);
     return pipeline;
+}
+
+static int redis_request_job_data(long long job)
+{
+    // HMGET gives us the ordering guarantee we want for the reply array.
+    // Using HGETALL is briefer on this end, but the returned array contains
+    // the field labels anyway and the order of label/values is unknown, so
+    // we would be forced to inspect each label.  This longer command gives
+    // us a reply from redis with no labels and in the order we prescribe
+    redisAppendCommand(ctx, "HMGET %s:%lld %s %s %s %s %s %s %s %s %s %s "
+        "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s ", keytag, job,
+        field_labels[0], field_labels[1], field_labels[2], field_labels[3],
+        field_labels[4], field_labels[5], field_labels[6], field_labels[7],
+        field_labels[8], field_labels[9], field_labels[10], field_labels[11],
+        field_labels[12], field_labels[13], field_labels[14], field_labels[15],
+        field_labels[16], field_labels[17], field_labels[18], field_labels[19],
+        field_labels[20], field_labels[21], field_labels[22], field_labels[23],
+        field_labels[24], field_labels[25], field_labels[26]);
+    return 1;
+}
+
+static void redis_receive_jobs(int pipeline)
+{
+    redisReply *reply;
+    int i = 0;
+    for (; i < pipeline; ++i) {
+        redisGetReply(ctx, (void **)&reply);
+        switch (reply->type) {
+            case REDIS_REPLY_ARRAY:
+                slurm_debug("JobID=%s Partition=%s Start=%s End=%s",
+                    reply->element[0]->str, reply->element[1]->str,
+                    reply->element[2]->str, reply->element[3]->str);
+                break;
+            case REDIS_REPLY_ERROR:
+                break;
+            default:
+                break;
+        }
+        freeReplyObject(reply);
+        reply = NULL;
+    }
 }
 
 int init(void)
@@ -266,7 +307,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     uuid_generate(uuid);
     uuid_unparse(uuid, uuid_s);
 
-    // Create redis hash set for the scalar query criteria
+    // Create redis hash set for the scalar (singleton) job criteria
     char *start = jobcomp_redis_format_time(job_cond->usage_start);
     char *end = jobcomp_redis_format_time(job_cond->usage_end);
     redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", keytag,
@@ -281,36 +322,36 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->userid_list);
+        pipeline += redis_add_job_criteria(key, job_cond->userid_list);
     }
 
     // Create redis set for groupid_list
     if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->groupid_list);
+        pipeline += redis_add_job_criteria(key, job_cond->groupid_list);
     }
 
     // Create redis set for jobname_list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->jobname_list);
+        pipeline += redis_add_job_criteria(key, job_cond->jobname_list);
     }
 
     // Create redis set for partition_list
     if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", keytag, uuid_s);
-        pipeline += redis_sadd_list(key, job_cond->partition_list);
+        pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
     // Ask the redis server for matches to the criteria
     redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", keytag, uuid_s);
     ++pipeline;
 
-    // Pop the pipeline replies.  The only thing we really care about is
-    // the name of the match set on the last reply
+    // Pop the pipeline replies.  The only thing we care about is the name of
+    // the match set on the last reply
     char *set = NULL;
     redisReply *reply;
     int i = 0;
@@ -328,6 +369,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     if (!set) {
         return NULL;
     }
+    pipeline = 0;
 
     // Next we need to pull down the match set which contains only the job ids
     // of the matching jobs.  We then run successive pipelines of requests for
@@ -363,10 +405,11 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
                 || (errno != 0 && job == 0)) {
                 return NULL;
             }
-            slurm_debug("Job %lld matches", job);
+            pipeline += redis_request_job_data(job);
         }
         if (rc == SSCAN_PIPELINE) {
-            // Close the pipeline and pop all replies
+            redis_receive_jobs(pipeline);
+            pipeline=0;
         }
     } while (rc != SSCAN_EOF);
 
