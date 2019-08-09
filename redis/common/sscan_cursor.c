@@ -146,7 +146,7 @@ int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len)
 {
     assert(cursor != NULL);
     assert(cursor->ctx != NULL);
-    if (cursor->err && err && *err) {
+    if (cursor->err && err) {
         *err = RedisModule_StringPtrLen(cursor->err, len);
         return SSCAN_ERR;
     }
@@ -188,7 +188,7 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
         RedisModuleCallReply *subreply_element =
             RedisModule_CallReplyArrayElement(cursor->subreply_array,
                 cursor->array_ix);
-        if (subreply_element && ret && *ret) {
+        if (subreply_element && ret) {
             *ret = RedisModule_CallReplyStringPtr(subreply_element, len);
         }
         ++cursor->array_ix;
