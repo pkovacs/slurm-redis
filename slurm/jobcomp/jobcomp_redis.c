@@ -289,7 +289,7 @@ typedef struct {
 List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 {
     if (!job_cond) {
-        return SLURM_SUCCESS;
+        return NULL;
     }
 
     if (!redis_connected()) {
