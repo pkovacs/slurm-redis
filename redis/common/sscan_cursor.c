@@ -41,9 +41,9 @@ typedef struct sscan_cursor {
     RedisModuleCallReply *subreply_array;
     const char *set;
     long long count;
-    long long cursor;
-    size_t next_element;
-    size_t total_elements;
+    long long value;
+    size_t chunk_ix;
+    size_t chunk_sz;
 } *sscan_cursor_t;
 
 static void call_sscan_internal(sscan_cursor_t cursor)
@@ -54,12 +54,12 @@ static void call_sscan_internal(sscan_cursor_t cursor)
         cursor->reply = NULL;
         cursor->subreply_array = NULL;
     }
-    cursor->next_element = 0;
-    cursor->total_elements = 0;
+    cursor->chunk_ix = 0;
+    cursor->chunk_sz = 0;
 
     // Call SSCAN
     cursor->reply = RedisModule_Call(cursor->ctx, "SSCAN", "clcl", cursor->set,
-        cursor->cursor, "COUNT", cursor->count);
+        cursor->value, "COUNT", cursor->count);
 
     if ((RedisModule_CallReplyType(cursor->reply) != REDISMODULE_REPLY_ARRAY) ||
         (RedisModule_CallReplyLength(cursor->reply) != 2)) {
@@ -88,16 +88,16 @@ static void call_sscan_internal(sscan_cursor_t cursor)
             REDISMODULE_ERRORMSG_WRONGTYPE);
         return;
     } else if (cursor->subreply_array) {
-        cursor->total_elements =
+        cursor->chunk_sz =
             RedisModule_CallReplyLength(cursor->subreply_array);
     }
 
     // Convert the string cursor value to an integer
-    cursor->cursor = strtoll(RedisModule_CallReplyStringPtr(subreply_cursor,
+    cursor->value = strtoll(RedisModule_CallReplyStringPtr(subreply_cursor,
         NULL), NULL, 10);
     if ((errno == ERANGE &&
-            (cursor->cursor == LLONG_MAX || cursor->cursor == LLONG_MIN))
-        || (errno != 0 && cursor->cursor == 0)) {
+            (cursor->value == LLONG_MAX || cursor->value == LLONG_MIN))
+        || (errno != 0 && cursor->value == 0)) {
         cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
             "invalid cursor"); 
         return;
@@ -115,7 +115,7 @@ sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init)
     cursor->ctx = init->ctx;
     cursor->set = init->set;
     cursor->count = init->count;
-    cursor->cursor = -1;
+    cursor->value = -1;
     return cursor;
 }
 
@@ -138,23 +138,21 @@ void destroy_sscan_cursor(sscan_cursor_t *cursor)
     *cursor = NULL;
 }
 
-const char *sscan_error(sscan_cursor_t cursor, size_t *len)
+int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len)
 {
     assert(cursor != NULL);
     assert(cursor->ctx != NULL);
-    if (cursor->err) {
-        return RedisModule_StringPtrLen(cursor->err, len);
+    if (cursor->err && err && *err) {
+        *err = RedisModule_StringPtrLen(cursor->err, len);
+        return SSCAN_ERR;
     }
-    return NULL;
+    return SSCAN_OK;
 }
 
-const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
+int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
 {
     assert(cursor != NULL);
     assert(cursor->ctx != NULL);
-
-    const char *element = NULL;
-    size_t element_sz = 0;
 
     if (cursor->err) {
         RedisModule_FreeString(cursor->ctx, cursor->err);
@@ -164,28 +162,32 @@ const char *sscan_next_element(sscan_cursor_t cursor, size_t *len)
     // a full iteration with SSCAN, it is required that we keep calling
     // SSCAN until the cursor value on reply[0] is zero. We consume the
     // array on reply[1] one at a time with each sscan_next_element.
-    while (cursor->cursor != 0 &&
+    while (cursor->value != 0 &&
             ((cursor->subreply_array == NULL) ||
-             (cursor->next_element >= cursor->total_elements))) {
+             (cursor->chunk_ix >= cursor->chunk_sz))) {
         call_sscan_internal(cursor);
         if (cursor->err) {
-            return RedisModule_StringPtrLen(cursor->err, len);
+            return SSCAN_ERR;
         }
     }
+
+    // Are we done?
+    if (cursor->value == 0 &&
+        ((cursor->subreply_array == NULL) ||
+         (cursor->chunk_ix >= cursor->chunk_sz))) {
+        return SSCAN_EOF;
+    }
+
     // If we have an array on the sub-reply, consume it one at a time
     if (cursor->subreply_array &&
-        (cursor->next_element < cursor->total_elements)) {
+        (cursor->chunk_ix < cursor->chunk_sz)) {
         RedisModuleCallReply *subreply_element =
             RedisModule_CallReplyArrayElement(cursor->subreply_array,
-                cursor->next_element);
-        ++cursor->next_element;
-        if (subreply_element) {
-            element = RedisModule_CallReplyStringPtr(subreply_element,
-                &element_sz);
+                cursor->chunk_ix);
+        ++cursor->chunk_ix;
+        if (subreply_element && ret && *ret) {
+            *ret = RedisModule_CallReplyStringPtr(subreply_element, len);
         }
     }
-    if (len) {
-        *len = element_sz;
-    }
-    return element;
+    return SSCAN_OK;
 }

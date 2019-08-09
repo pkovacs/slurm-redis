@@ -129,6 +129,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     // Inspect each index for jobs that match
     for (; day <= end_day; ++day) {
 
+        int rc;
         const char *element, *err;
         size_t element_sz, err_sz;
         RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
@@ -141,20 +142,18 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         };
         AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
             create_sscan_cursor(&init);
-        err = sscan_error(cursor, &err_sz);
-        if (err) {
+        if (sscan_error(cursor, &err, &err_sz) == SSCAN_ERR) {
             RedisModule_ReplyWithError(ctx, err);
-            destroy_sscan_cursor(&cursor);
             return REDISMODULE_ERR;
         }
         do {
-            element = sscan_next_element(cursor, &element_sz);
-            err = sscan_error(cursor, &err_sz);
-            if (err) {
+            rc = sscan_next_element(cursor, &element, &element_sz);
+            if (rc == SSCAN_ERR) {
+                sscan_error(cursor, &err, &err_sz);
                 RedisModule_ReplyWithError(ctx, err);
                 return REDISMODULE_ERR;
             }
-            if (element) {
+            if ((rc == SSCAN_OK) && element) {
                 long long job = strtoll(element, NULL, 10);
                 if ((errno == ERANGE &&
                         (job == LLONG_MAX || job == LLONG_MIN))
@@ -167,7 +166,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                     RedisModule_Call(ctx, "SADD", "sl", match, job);
                 }
             }
-        } while (element);
+        } while (rc != SSCAN_EOF);
         RedisModule_FreeString(ctx, idx);
         idx = NULL;
     }

@@ -33,6 +33,12 @@
  * A wrapper for creating and iterating over redis set scan cursors
  */
 
+enum {
+    SSCAN_ERR = -2,
+    SSCAN_EOF = -1,
+    SSCAN_OK = 0,
+};
+
 // Set scan cursor is an opaque pointer
 typedef struct sscan_cursor *sscan_cursor_t;
 
@@ -49,10 +55,10 @@ sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init);
 // Destroy a set scan cursor
 void destroy_sscan_cursor(sscan_cursor_t *cursor);
 
-// Check for error
-const char *sscan_error(sscan_cursor_t cursor, size_t *len);
+// Return last error that occurred, integer status (enum)
+int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len);
 
-// Return next string of the cursor
-const char *sscan_next_element(sscan_cursor_t cursor, size_t *len);
+// Return next element and element size byref, integer status (enum)
+int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len);
 
 #endif /* SSCAN_CURSOR_H */
