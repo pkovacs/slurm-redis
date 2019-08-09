@@ -27,11 +27,11 @@
 #define SSCAN_CURSOR_H
 
 #include <stddef.h>
-#include <redismodule.h>
+#include <hiredis.h>
 
 /*
  * A wrapper for creating and iterating over redis set scan cursors
- * using the redis module api
+ * using the hiredis client library
  */
 
 enum {
@@ -45,8 +45,8 @@ typedef struct sscan_cursor *sscan_cursor_t;
 
 // Set scan cursor initialization
 typedef struct {
-    RedisModuleCtx *ctx;
-    RedisModuleString *set;
+    redisContext *ctx;
+    char *set;
     long long count;
 } sscan_cursor_init_t;
 

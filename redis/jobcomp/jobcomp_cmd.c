@@ -134,10 +134,9 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         size_t element_sz, err_sz;
         RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
             "%s:idx:%lld:end", keytag, day);
-
         sscan_cursor_init_t init = {
             .ctx = ctx,
-            .set = RedisModule_StringPtrLen(idx, NULL),
+            .set = idx,
             .count = 500
         };
         AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
@@ -167,8 +166,6 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                 }
             }
         } while (rc != SSCAN_EOF);
-        RedisModule_FreeString(ctx, idx);
-        idx = NULL;
     }
 
     RedisModuleKey *mkey = RedisModule_OpenKey(ctx, match, REDISMODULE_WRITE);

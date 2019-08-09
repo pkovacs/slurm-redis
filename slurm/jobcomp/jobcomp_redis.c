@@ -27,7 +27,10 @@
 #include "config.h"
 #endif
 
+#include <errno.h>
+#include <limits.h>
 #include <string.h>
+#include <stdlib.h>
 #include <hiredis.h>
 #include <uuid.h>
 
@@ -37,6 +40,7 @@
 #include <src/common/xstring.h> /* xstrdup, ... */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
+#include "slurm/common/sscan_cursor.h"
 #include "jobcomp_redis_format.h"
 
 #define USER_CACHE_SZ 64
@@ -134,10 +138,7 @@ int fini(void)
         redisFree(ctx);
         ctx = NULL;
     }
-    if (keytag) {
-        xfree(keytag);
-        keytag = NULL;
-    }
+    xfree(keytag);
     jobcomp_redis_format_fini();
     return SLURM_SUCCESS;
 }
@@ -198,8 +199,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         keytag, fields->value[kJobID]);
     ++pipeline;
 
-    // TODO: error checking
-    // Pop off the pipelined replies
+    // Pop off the pipelined replies.
     redisReply *reply;
     for (i = 0; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
@@ -209,13 +209,9 @@ int slurm_jobcomp_log_record(struct job_record *job)
 
     // Free Mars
     for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
-        if (fields->value[i]) {
-            xfree(fields->value[i]);
-            fields->value[i] = NULL;
-        }
+        xfree(fields->value[i]);
     }
     xfree(fields);
-    fields = NULL;
 
     return SLURM_SUCCESS;
 }
@@ -313,14 +309,58 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", keytag, uuid_s);
     ++pipeline;
 
-    // TODO: error checking
-    // Pop off the pipelined replies
+    // Pop off the pipelined replies.  The only thing we really
+    // care about is the name of the match set on the last reply
+    char *set = NULL;
     redisReply *reply;
     for (i = 0; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
+        if (i == pipeline-1) {
+            if (reply->type == REDIS_REPLY_STRING && reply->str) {
+                set = xstrdup(reply->str);
+            }
+        }
         freeReplyObject(reply);
         reply = NULL;
     }
+    slurm_debug("Redis match set: %s", set ? set : "(null)");
+    if (!set) {
+        return NULL;
+    }
+
+    int rc;
+    const char *element, *err;
+    size_t element_sz, err_sz;
+    sscan_cursor_init_t init = {
+        .ctx = ctx,
+        .set = set,
+        .count = 500
+    };
+    AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
+        create_sscan_cursor(&init);
+    if (sscan_error(cursor, &err, &err_sz) == SSCAN_ERR) {
+            slurm_debug("sscan err: %s", err);
+            return NULL;
+        }
+        do {
+            rc = sscan_next_element(cursor, &element, &element_sz);
+            if (rc == SSCAN_ERR) {
+                sscan_error(cursor, &err, &err_sz);
+                slurm_debug("sscan err: %s", err);
+                return NULL;
+            }
+            if ((rc == SSCAN_OK) && element) {
+                long long job = strtoll(element, NULL, 10);
+                if ((errno == ERANGE &&
+                        (job == LLONG_MAX || job == LLONG_MIN))
+                    || (errno != 0 && job == 0)) {
+                    slurm_debug("invalid job id");
+                    return NULL;
+                }
+
+                slurm_debug("Job %lld matches", job);
+            }
+        } while (rc != SSCAN_EOF);
 
     return NULL;
 }
