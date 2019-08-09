@@ -40,42 +40,6 @@
 
 #define REPLY_ERRORMSG_WRONGTYPE "WRONGTYPE reply is of the wrong type"
 
-#if 0
-/* Context for a connection to Redis */
-typedef struct redisContext {
-    int err; /* Error flags, 0 when there is no error */
-    char errstr[128]; /* String representation of error when applicable */
-    int fd;
-    int flags;
-    char *obuf; /* Write buffer */
-    redisReader *reader; /* Protocol reader */
-
-    enum redisConnectionType connection_type;
-    struct timeval *timeout;
-
-    struct {
-        char *host;
-        char *source_addr;
-        int port;
-    } tcp;
-
-    struct {
-        char *path;
-    } unix_sock;
-
-} redisContext;
-
-/* This is the reply object returned by redisCommand() */
-typedef struct redisReply {
-    int type; /* REDIS_REPLY_* */
-    long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
-    int len; /* Length of string */
-    char *str; /* Used for both REDIS_REPLY_ERROR and REDIS_REPLY_STRING */
-    size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
-    struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
-} redisReply;
-#endif
-
 typedef struct sscan_cursor {
     redisContext *ctx;
     redisReply *reply;
@@ -100,8 +64,6 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     // Call SSCAN
     cursor->reply = redisCommand(cursor->ctx, "SSCAN %s %lld COUNT %lld",
         cursor->set, cursor->value, cursor->count);
-
-    redisGetReply(cursor->ctx, (void **)&cursor->reply);
     if ((cursor->reply->type != REDIS_REPLY_ARRAY) ||
         (cursor->reply->elements != 2)) {
         cursor->err = xstrdup(REPLY_ERRORMSG_WRONGTYPE);
@@ -168,7 +130,7 @@ int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len)
 {
     assert(cursor != NULL);
     assert(cursor->ctx != NULL);
-    if (cursor->err && err && *err) {
+    if (cursor->err && err) {
         *err = cursor->err;
         if (len) {
             *len = strlen(cursor->err);
@@ -184,6 +146,7 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
     assert(cursor->ctx != NULL);
 
     xfree(cursor->err);
+
     // We are hiding the repeated calls to SSCAN.  In order to complete
     // a full iteration with SSCAN, it is required that we keep calling
     // SSCAN until the cursor value on reply[0] is zero. We consume the
@@ -207,7 +170,7 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
     // If we have an array on the sub-reply, consume it one at a time
     if (cursor->subreply_array &&
         (cursor->array_ix < cursor->subreply_array->elements)) {
-        if (cursor->subreply_array->element[cursor->array_ix] && ret && *ret) {
+        if (cursor->subreply_array->element[cursor->array_ix] && ret) {
             *ret = cursor->subreply_array->element[cursor->array_ix]->str;
             if (len) {
                 *len = cursor->subreply_array->element[cursor->array_ix]->len;
