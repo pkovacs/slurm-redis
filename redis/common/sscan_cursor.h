@@ -55,7 +55,7 @@ sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init);
 // Destroy a set scan cursor
 void destroy_sscan_cursor(sscan_cursor_t *cursor);
 
-// Return last error that occurred, integer status (enum)
+// Return last error and error size byref, integer status (enum)
 int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len);
 
 // Return next element and element size byref, integer status (enum)
