@@ -38,6 +38,7 @@ enum {
     SSCAN_ERR = -2,
     SSCAN_EOF = -1,
     SSCAN_OK = 0,
+    SSCAN_PIPELINE = 1
 };
 
 // Set scan cursor is an opaque pointer

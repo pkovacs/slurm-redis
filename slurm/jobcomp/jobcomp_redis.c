@@ -199,7 +199,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         keytag, fields->value[kJobID]);
     ++pipeline;
 
-    // Pop off the pipelined replies.
+    // Pop the pipeline replies
     redisReply *reply;
     for (i = 0; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
@@ -257,16 +257,16 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         redis_connect();
     }
 
-    int i, pipeline = 0;
+    int pipeline = 0;
     char uuid_s[37];
     char key[128];
     uuid_t uuid;
 
-    // Generate a random uuid for the request keys
+    // Generate a random uuid for the query keys
     uuid_generate(uuid);
     uuid_unparse(uuid, uuid_s);
 
-    // Create redis hash set for the scalar criteria
+    // Create redis hash set for the scalar query criteria
     char *start = jobcomp_redis_format_time(job_cond->usage_start);
     char *end = jobcomp_redis_format_time(job_cond->usage_end);
     redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", keytag,
@@ -309,11 +309,12 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", keytag, uuid_s);
     ++pipeline;
 
-    // Pop off the pipelined replies.  The only thing we really
-    // care about is the name of the match set on the last reply
+    // Pop the pipeline replies.  The only thing we really care about is
+    // the name of the match set on the last reply
     char *set = NULL;
     redisReply *reply;
-    for (i = 0; i < pipeline; ++i) {
+    int i = 0;
+    for (; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
         if (i == pipeline-1) {
             if (reply->type == REDIS_REPLY_STRING && reply->str) {
@@ -328,6 +329,11 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         return NULL;
     }
 
+    // Next we need to pull down the match set which contains only the job ids
+    // of the matching jobs.  We then run successive pipelines of requests for
+    // full job completion data and build the jobcomp_job_rec_t list that slurm
+    // requires
+
     int rc;
     const char *element, *err;
     size_t element_sz, err_sz;
@@ -339,25 +345,30 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
         create_sscan_cursor(&init);
     if (sscan_error(cursor, &err, &err_sz) == SSCAN_ERR) {
+        return NULL;
+    }
+    do {
+        // We must enter the cursor with no open pipeline. We can build
+        // a pipeline as we loop, until we get SSCAN_PIPELINE which is a
+        // warning that the next iteration will not be pipeline friendly
+        rc = sscan_next_element(cursor, &element, &element_sz);
+        if (rc == SSCAN_ERR) {
+            sscan_error(cursor, &err, &err_sz);
             return NULL;
         }
-        do {
-            rc = sscan_next_element(cursor, &element, &element_sz);
-            if (rc == SSCAN_ERR) {
-                sscan_error(cursor, &err, &err_sz);
+        if ((rc == SSCAN_OK || rc == SSCAN_PIPELINE) && element) {
+            long long job = strtoll(element, NULL, 10);
+            if ((errno == ERANGE &&
+                    (job == LLONG_MAX || job == LLONG_MIN))
+                || (errno != 0 && job == 0)) {
                 return NULL;
             }
-            if ((rc == SSCAN_OK) && element) {
-                long long job = strtoll(element, NULL, 10);
-                if ((errno == ERANGE &&
-                        (job == LLONG_MAX || job == LLONG_MIN))
-                    || (errno != 0 && job == 0)) {
-                    return NULL;
-                }
-
-                slurm_debug("Job %lld matches", job);
-            }
-        } while (rc != SSCAN_EOF);
+            slurm_debug("Job %lld matches", job);
+        }
+        if (rc == SSCAN_PIPELINE) {
+            // Close the pipeline and pop all replies
+        }
+    } while (rc != SSCAN_EOF);
 
     return NULL;
 }

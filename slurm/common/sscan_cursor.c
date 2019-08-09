@@ -151,6 +151,7 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
     // a full iteration with SSCAN, it is required that we keep calling
     // SSCAN until the cursor value on reply[0] is zero. We consume the
     // array on reply[1] one at a time with each sscan_next_element.
+    // The first call to sscan_next_element requires no open pipelines
     while (cursor->value != 0 &&
             ((cursor->subreply_array == NULL) ||
              (cursor->array_ix >= cursor->subreply_array->elements))) {
@@ -177,6 +178,14 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
             }
         }
         ++cursor->array_ix;
+        // While everything is OK here, we warn the caller that the next
+        // call to sscan_next_element will issue a blocking command/reply
+        // for the next chunk of data elements.  That call is not pipeline
+        // friendly, so we tell the caller to close any open pipeline and
+        // fetch all replies before calling sscan_next_element again
+        if (cursor->array_ix == cursor->subreply_array->elements) {
+            return SSCAN_PIPELINE;
+        }
     }
     return SSCAN_OK;
 }
