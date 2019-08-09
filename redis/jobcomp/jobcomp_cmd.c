@@ -172,18 +172,19 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     }
 
     RedisModuleKey *mkey = RedisModule_OpenKey(ctx, match, REDISMODULE_WRITE);
-    if ((RedisModule_KeyType(mkey) != REDISMODULE_KEYTYPE_EMPTY) &&
-        (RedisModule_KeyType(mkey) != REDISMODULE_KEYTYPE_SET)) {
+    if (RedisModule_KeyType(mkey) == REDISMODULE_KEYTYPE_EMPTY) {
+        RedisModule_ReplyWithNull(ctx);
+        return REDISMODULE_OK;
+    }
+    if (RedisModule_KeyType(mkey) != REDISMODULE_KEYTYPE_SET) {
         RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
         return REDISMODULE_ERR;
     }
-    if (RedisModule_KeyType(mkey) == REDISMODULE_KEYTYPE_SET &&
-            (RedisModule_SetExpire(mkey, QUERY_KEY_TTL * 1000)
-                == REDISMODULE_ERR)) {
+    if (RedisModule_SetExpire(mkey, QUERY_KEY_TTL * 1000) == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "failed to set ttl on match set");
         return REDISMODULE_ERR;
     }
 
-    RedisModule_ReplyWithSimpleString(ctx, "OK");
+    RedisModule_ReplyWithString(ctx, match);
     return REDISMODULE_OK;
 }
