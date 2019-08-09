@@ -27,10 +27,8 @@
 #include "config.h"
 #endif
 
-#include <errno.h>
-#include <limits.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <hiredis.h>
 #include <uuid.h>
 
@@ -112,14 +110,14 @@ static int redis_add_job_criteria(const char *key, const List list) {
     return pipeline;
 }
 
-static int redis_request_job_data(long long job)
+static int redis_request_job_data(const char *job)
 {
     // HMGET gives us the ordering guarantee we want for the reply array.
     // Using HGETALL is briefer on this end, but the returned array contains
     // the field labels anyway and the order of label/values is unknown, so
     // we would be forced to inspect each label.  This longer command gives
     // us a reply from redis with no labels and in the order we prescribe
-    redisAppendCommand(ctx, "HMGET %s:%lld %s %s %s %s %s %s %s %s %s %s "
+    redisAppendCommand(ctx, "HMGET %s:%s %s %s %s %s %s %s %s %s %s %s "
         "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s ", keytag, job,
         field_labels[0], field_labels[1], field_labels[2], field_labels[3],
         field_labels[4], field_labels[5], field_labels[6], field_labels[7],
@@ -399,13 +397,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
             return NULL;
         }
         if ((rc == SSCAN_OK || rc == SSCAN_PIPELINE) && element) {
-            long long job = strtoll(element, NULL, 10);
-            if ((errno == ERANGE &&
-                    (job == LLONG_MAX || job == LLONG_MIN))
-                || (errno != 0 && job == 0)) {
-                return NULL;
-            }
-            pipeline += redis_request_job_data(job);
+            pipeline += redis_request_job_data(element);
         }
         if (rc == SSCAN_PIPELINE) {
             redis_receive_jobs(pipeline);
