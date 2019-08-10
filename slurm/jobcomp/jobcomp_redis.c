@@ -57,7 +57,7 @@ const uint32_t plugin_version = SLURM_VERSION_NUMBER;
 static const char *host = "127.0.0.1";
 static const int port = 6379;
 static redisContext *ctx = NULL;
-static char *keytag = NULL;
+static char *prefix = NULL;
 
 // Field labels for redis fields
 static const char *field_labels[] = {
@@ -118,7 +118,7 @@ static int redis_request_job_data(const char *job)
     // we would be forced to inspect each label.  This longer command gives
     // us a reply from redis with no labels and in the order we prescribe
     redisAppendCommand(ctx, "HMGET %s:%s %s %s %s %s %s %s %s %s %s %s "
-        "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s ", keytag, job,
+        "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s ", prefix, job,
         field_labels[0], field_labels[1], field_labels[2], field_labels[3],
         field_labels[4], field_labels[5], field_labels[6], field_labels[7],
         field_labels[8], field_labels[9], field_labels[10], field_labels[11],
@@ -186,7 +186,7 @@ int fini(void)
         redisFree(ctx);
         ctx = NULL;
     }
-    xfree(keytag);
+    xfree(prefix);
     jobcomp_redis_format_fini();
     return SLURM_SUCCESS;
 }
@@ -201,15 +201,15 @@ int slurm_jobcomp_set_location(char *location)
         return SLURM_ERROR;
     }
 
-    if (keytag) {
+    if (prefix) {
         return SLURM_SUCCESS;
     }
 
     char *loc = location ? xstrdup(location) : slurm_get_jobcomp_loc();
     if (!loc || strcmp(loc, DEFAULT_JOB_COMP_LOC) == 0) {
-        keytag = xstrdup("job");
+        prefix = xstrdup("job");
     } else if (loc) {
-        keytag = xstrdup_printf("%s:job", loc);
+        prefix = xstrdup_printf("%s:job", loc);
     }
     xfree(loc);
     return SLURM_SUCCESS;
@@ -236,7 +236,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
     for (; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
             redisAppendCommand(ctx, "HSET %s:%s %s %s",
-                keytag, fields->value[kJobID],
+                prefix, fields->value[kJobID],
                 field_labels[i], fields->value[i]);
             ++pipeline;
         }
@@ -244,7 +244,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
 
     // Index the job on the redis server
     redisAppendCommand(ctx, "SLURMJC.INDEX %s %s",
-        keytag, fields->value[kJobID]);
+        prefix, fields->value[kJobID]);
     ++pipeline;
 
     // Pop the pipeline replies
@@ -317,9 +317,9 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     // Create redis hash set for the scalar (singleton) job criteria
     char *start = jobcomp_redis_format_time(job_cond->usage_start);
     char *end = jobcomp_redis_format_time(job_cond->usage_end);
-    redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", keytag,
+    redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", prefix,
         uuid_s, start, end);
-    redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", keytag, uuid_s,
+    redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
         QUERY_KEY_TTL);
     pipeline += 2;
     xfree(start);
@@ -328,33 +328,33 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     // Create redis set for userid_list
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", keytag, uuid_s);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->userid_list);
     }
 
     // Create redis set for groupid_list
     if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", keytag, uuid_s);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->groupid_list);
     }
 
     // Create redis set for jobname_list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", keytag, uuid_s);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->jobname_list);
     }
 
     // Create redis set for partition_list
     if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", keytag, uuid_s);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
     // Ask the redis server for matches to the criteria
-    redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", keytag, uuid_s);
+    redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
     ++pipeline;
 
     // Pop the pipeline replies.  The only thing we care about is the name of

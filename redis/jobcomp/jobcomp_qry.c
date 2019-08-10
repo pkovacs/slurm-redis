@@ -39,7 +39,7 @@
 
 typedef struct job_query {
     RedisModuleCtx *ctx;
-    const char *keytag;
+    const char *prefix;
     const char *uuid;
     long long start_day;
     long long end_day;
@@ -58,11 +58,11 @@ job_query_t create_job_query(const job_query_init_t *init)
     AUTO_PTR(destroy_job_query) job_query_t qry_auto = qry;
 
     qry->ctx = init->ctx;
-    qry->keytag = init->keytag;
+    qry->prefix = init->prefix;
     qry->uuid = init->uuid;
 
     RedisModuleString *keyname = RedisModule_CreateStringPrintf(qry->ctx,
-        "%s:qry:%s", qry->keytag, qry->uuid);
+        "%s:qry:%s", qry->prefix, qry->uuid);
 
     // Open the main query key
     RedisModuleKey *key = RedisModule_OpenKey(qry->ctx, keyname,
@@ -138,7 +138,7 @@ int job_query_match_job(const job_query_t qry, long long job)
 
     // Open job key
     RedisModuleString *keyname = RedisModule_CreateStringPrintf(qry->ctx,
-        "%s:%lld", qry->keytag, job);
+        "%s:%lld", qry->prefix, job);
     RedisModuleKey *key = RedisModule_OpenKey(qry->ctx, keyname,
         REDISMODULE_READ);
     if ((RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_EMPTY) &&

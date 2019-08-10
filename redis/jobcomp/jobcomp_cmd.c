@@ -39,6 +39,9 @@
 #include "redis/common/sscan_cursor.h"
 #include "jobcomp_qry.h"
 
+/*
+ * SLURMJC.INDEX <prefix> <job>
+ */
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
     RedisModule_AutoMemory(ctx);
@@ -46,10 +49,10 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return RedisModule_WrongArity(ctx);
     }
 
-    const char *keytag = RedisModule_StringPtrLen(argv[1], NULL);
+    const char *prefix = RedisModule_StringPtrLen(argv[1], NULL);
     const char *jobid = RedisModule_StringPtrLen(argv[2], NULL);
     RedisModuleString *keyname = RedisModule_CreateStringPrintf(ctx,
-        "%s:%s", keytag, jobid);
+        "%s:%s", prefix, jobid);
     RedisModuleCallReply *reply = NULL;
     long long end_time;
 
@@ -88,7 +91,7 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     // Create or update the end index
     long long end_days = end_time / SECONDS_PER_DAY;
     RedisModuleString *idx_end = RedisModule_CreateStringPrintf(ctx,
-        "%s:idx:%lld:end", keytag, end_days);
+        "%s:idx:%lld:end", prefix, end_days);
     reply = RedisModule_Call(ctx, "SADD", "sc", idx_end, jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
@@ -99,6 +102,9 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     return REDISMODULE_OK;
 }
 
+/*
+ * SLURMJC.MATCH <prefix> <uuid>
+ */
 int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
     RedisModule_AutoMemory(ctx);
@@ -106,12 +112,11 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return RedisModule_WrongArity(ctx);
     }
 
-    const char *keytag = RedisModule_StringPtrLen(argv[1], NULL);
+    const char *prefix = RedisModule_StringPtrLen(argv[1], NULL);
     const char *uuid = RedisModule_StringPtrLen(argv[2], NULL);
-
     job_query_init_t init = {
         .ctx = ctx,
-        .keytag = keytag,
+        .prefix = prefix,
         .uuid = uuid,
     };
     AUTO_PTR(destroy_job_query) job_query_t qry = create_job_query(&init);
@@ -119,7 +124,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return REDISMODULE_ERR;
     }
     RedisModuleString *match = RedisModule_CreateStringPrintf(ctx,
-        "%s:mat:%s", keytag, uuid);
+        "%s:mat:%s", prefix, uuid);
 
     // The range of index keys we will inspect
     long long start_day = job_query_start_day(qry);
@@ -133,7 +138,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         const char *element, *err;
         size_t element_sz, err_sz;
         RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
-            "%s:idx:%lld:end", keytag, day);
+            "%s:idx:%lld:end", prefix, day);
         sscan_cursor_init_t init = {
             .ctx = ctx,
             .set = idx,
@@ -186,6 +191,9 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     return REDISMODULE_OK;
 }
 
+/*
+ * SLURMJC.FETCH <prefix> <uuid>
+ */
 int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
     RedisModule_ReplyWithNull(ctx);
