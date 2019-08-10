@@ -32,6 +32,8 @@
 #include <src/common/slurm_jobcomp.h> /* jobcomp_job_rec_t */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
+#include <common/redis_fields.h>
+
 /*
  * From slurm/src/common/slurm_jobcomp.h: the jobcomp_job_rec_t below
  * itemizes the data that a jobcomp plugin manages.
@@ -72,18 +74,6 @@ typedef struct {
  *  char *exit_code;      // ExitCode   +
 } jobcomp_job_rec_t;
  */
-
-#define MAX_REDIS_FIELDS 27
-
-// Value index of redis field within redis_fields_t
-enum redis_field_value_index {
-    kJobID = 0, kPartition = 1, kStart = 2, kEnd = 3, kElapsed = 4, kUID = 5,
-    kUser = 6, kGID = 7, kGroup = 8, kNNodes = 9, kNCPUs = 10, kNodeList = 11,
-    kJobName = 12, kState = 13, kTimeLimit = 14, kBlockID = 15, kWorkDir = 16,
-    kReservation = 17, kReqGRES = 18, kAccount = 19, kQOS = 20, kWCKey = 21,
-    kCluster = 22, kSubmit = 23, kEligible = 24, kDerivedExitCode = 25,
-    kExitCode = 26
-};
 
 // Array of redis field values
 typedef struct redis_fields {

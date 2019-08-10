@@ -59,14 +59,6 @@ static const int port = 6379;
 static redisContext *ctx = NULL;
 static char *prefix = NULL;
 
-// Field labels for redis fields
-static const char *field_labels[] = {
-    "JobID", "Partition", "Start", "End", "Elapsed", "UID", "User", "GID",
-    "Group", "NNodes", "NCPUs", "NodeList", "JobName", "State", "TimeLimit",
-    "BlockID", "WorkDir", "Reservation", "ReqGRES", "Account", "QOS", "WCKey",
-    "Cluster", "Submit", "Eligible", "DerivedExitCode", "ExitCode"
-};
-
 static int redis_connect(void)
 {
     if (ctx) {
@@ -119,13 +111,13 @@ static int redis_request_job_data(const char *job)
     // us a reply from redis with no labels and in the order we prescribe
     redisAppendCommand(ctx, "HMGET %s:%s %s %s %s %s %s %s %s %s %s %s "
         "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s ", prefix, job,
-        field_labels[0], field_labels[1], field_labels[2], field_labels[3],
-        field_labels[4], field_labels[5], field_labels[6], field_labels[7],
-        field_labels[8], field_labels[9], field_labels[10], field_labels[11],
-        field_labels[12], field_labels[13], field_labels[14], field_labels[15],
-        field_labels[16], field_labels[17], field_labels[18], field_labels[19],
-        field_labels[20], field_labels[21], field_labels[22], field_labels[23],
-        field_labels[24], field_labels[25], field_labels[26]);
+        redis_field_labels[0], redis_field_labels[1], redis_field_labels[2], redis_field_labels[3],
+        redis_field_labels[4], redis_field_labels[5], redis_field_labels[6], redis_field_labels[7],
+        redis_field_labels[8], redis_field_labels[9], redis_field_labels[10], redis_field_labels[11],
+        redis_field_labels[12], redis_field_labels[13], redis_field_labels[14], redis_field_labels[15],
+        redis_field_labels[16], redis_field_labels[17], redis_field_labels[18], redis_field_labels[19],
+        redis_field_labels[20], redis_field_labels[21], redis_field_labels[22], redis_field_labels[23],
+        redis_field_labels[24], redis_field_labels[25], redis_field_labels[26]);
     return 1;
 }
 
@@ -237,7 +229,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         if (fields->value[i]) {
             redisAppendCommand(ctx, "HSET %s:%s %s %s",
                 prefix, fields->value[kJobID],
-                field_labels[i], fields->value[i]);
+                redis_field_labels[i], fields->value[i]);
             ++pipeline;
         }
     }
