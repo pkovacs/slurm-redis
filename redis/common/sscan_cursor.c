@@ -190,6 +190,11 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
                 cursor->array_ix);
         if (subreply_element && ret) {
             *ret = RedisModule_CallReplyStringPtr(subreply_element, len);
+        } else if (ret) {
+            *ret = NULL;
+            if (len) {
+                *len = 0;
+            }
         }
         ++cursor->array_ix;
     }
