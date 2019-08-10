@@ -30,8 +30,10 @@
 
 #define JOBCOMP_CMD_INDEX "SLURMJC.INDEX"
 #define JOBCOMP_CMD_MATCH "SLURMJC.MATCH"
+#define JOBCOMP_CMD_FETCH "SLURMJC.FETCH"
 
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
 int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
+int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
 
 #endif /* JOBCOMP_CMD_H */

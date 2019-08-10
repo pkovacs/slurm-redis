@@ -185,3 +185,9 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     RedisModule_ReplyWithString(ctx, match);
     return REDISMODULE_OK;
 }
+
+int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
+{
+    RedisModule_ReplyWithNull(ctx);
+    return REDISMODULE_OK;
+}

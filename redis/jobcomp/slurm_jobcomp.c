@@ -56,5 +56,12 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx)
         return REDISMODULE_ERR;
     }
 
+    // Register the SLURMJC.FETCH command
+    if (RedisModule_CreateCommand(ctx, JOBCOMP_CMD_FETCH, jobcomp_cmd_fetch,
+            "readonly", 1, 1, 1)
+        == REDISMODULE_ERR) {
+        return REDISMODULE_ERR;
+    }
+
     return REDISMODULE_OK;
 }
