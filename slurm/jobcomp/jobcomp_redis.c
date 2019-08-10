@@ -137,10 +137,19 @@ static void redis_receive_jobs(int pipeline)
         redisGetReply(ctx, (void **)&reply);
         switch (reply->type) {
             case REDIS_REPLY_ARRAY:
+            {
+                // We can use the stack here and set the reply data pointers
+                // into the redis_fields_t with no memory allocation cost
+                redis_fields_t fields;
+                int j = 0;
+                for (; j < MAX_REDIS_FIELDS; ++j) {
+                    fields.value[j] = reply->element[j]->str;
+                }
                 slurm_debug("JobID=%s Partition=%s Start=%s End=%s",
-                    reply->element[0]->str, reply->element[1]->str,
-                    reply->element[2]->str, reply->element[3]->str);
+                    fields.value[kJobID], fields.value[kPartition],
+                    fields.value[kStart], fields.value[kEnd]);
                 break;
+            }
             case REDIS_REPLY_ERROR:
                 break;
             default:
@@ -401,7 +410,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         }
         if (rc == SSCAN_PIPELINE) {
             redis_receive_jobs(pipeline);
-            pipeline=0;
+            pipeline = 0;
         }
     } while (rc != SSCAN_EOF);
 

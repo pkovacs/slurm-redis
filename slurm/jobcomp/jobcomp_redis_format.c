@@ -72,7 +72,6 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     assert(job != NULL);
     assert(fields != NULL);
     *fields = xmalloc(sizeof(redis_fields_t));
-    memset(*fields, 0, sizeof(redis_fields_t));
 
     char buf[64];
     memset(buf, 0, sizeof(buf));
