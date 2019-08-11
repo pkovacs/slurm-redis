@@ -68,6 +68,10 @@ void destroy_job_query(job_query_t *qry)
     if (!qry) {
         return;
     }
+    if ((*qry)->err) {
+        RedisModule_FreeString((*qry)->ctx, (*qry)->err);
+        (*qry)->err = NULL;
+    }
     RedisModule_Free(*qry);
     *qry = NULL;
 }
@@ -148,7 +152,6 @@ int job_query_prepare(job_query_t qry)
 int job_query_error(job_query_t qry, const char **err, size_t *len)
 {
     assert(qry != NULL);
-
     if (qry->err && err) {
         *err = RedisModule_StringPtrLen(qry->err, len);
         return QUERY_ERR;
