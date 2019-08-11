@@ -77,14 +77,14 @@ int job_query_prepare(job_query_t qry)
     assert(qry != NULL);
 
     // Open the primary query key
-    RedisModuleString *primary_s = RedisModule_CreateStringPrintf(qry->ctx,
+    RedisModuleString *primary = RedisModule_CreateStringPrintf(qry->ctx,
         "%s:qry:%s", qry->prefix, qry->uuid);
-    RedisModuleKey *primary = RedisModule_OpenKey(qry->ctx, primary_s,
+    RedisModuleKey *primary_key = RedisModule_OpenKey(qry->ctx, primary,
         REDISMODULE_READ);
-    if (RedisModule_KeyType(primary) == REDISMODULE_KEYTYPE_EMPTY) {
+    if (RedisModule_KeyType(primary_key) == REDISMODULE_KEYTYPE_EMPTY) {
         return QUERY_NULL;
     }
-    if (RedisModule_KeyType(primary) != REDISMODULE_KEYTYPE_HASH) {
+    if (RedisModule_KeyType(primary_key) != REDISMODULE_KEYTYPE_HASH) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             REDISMODULE_ERRORMSG_WRONGTYPE);
         return QUERY_ERR;
@@ -92,12 +92,13 @@ int job_query_prepare(job_query_t qry)
 
     // Fetch the scalar criteria on primary query key
     RedisModuleString *start = NULL, *end = NULL;
-    if (RedisModule_HashGet(primary, REDISMODULE_HASH_CFIELDS, "Start", &start,
-            "End", &end, NULL) == REDISMODULE_ERR) {
+    if (RedisModule_HashGet(primary_key, REDISMODULE_HASH_CFIELDS, "Start",
+            &start, "End", &end, NULL) == REDISMODULE_ERR) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "expected key(s) missing");
         return QUERY_ERR;
     }
+    RedisModule_CloseKey(primary_key);
 
     const char *start_c = RedisModule_StringPtrLen(start, NULL);
     const char *end_c = RedisModule_StringPtrLen(end, NULL);
@@ -163,25 +164,27 @@ int job_query_match_job(const job_query_t qry, long long job)
     // Open job key
     RedisModuleString *job_s = RedisModule_CreateStringPrintf(qry->ctx,
         "%s:%lld", qry->prefix, job);
-    RedisModuleKey *jobkey = RedisModule_OpenKey(qry->ctx, job_s,
+    RedisModuleKey *job_key = RedisModule_OpenKey(qry->ctx, job_s,
         REDISMODULE_READ);
-    if (RedisModule_KeyType(jobkey) == REDISMODULE_KEYTYPE_EMPTY) {
+    if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
         return QUERY_NULL;
     }
-    if (RedisModule_KeyType(jobkey) != REDISMODULE_KEYTYPE_HASH) {
+    if (RedisModule_KeyType(job_key) != REDISMODULE_KEYTYPE_HASH) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             REDISMODULE_ERRORMSG_WRONGTYPE);
         return QUERY_ERR;
     }
 
-    // Fetch job data
+    // Fetch job data on job key
     RedisModuleString *start = NULL, *end = NULL;
-    if (RedisModule_HashGet(jobkey, REDISMODULE_HASH_CFIELDS, "Start", &start,
+    if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS, "Start", &start,
             "End", &end, NULL) == REDISMODULE_ERR) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "error fetching job");
         return QUERY_ERR;
     }
+    RedisModule_CloseKey(job_key);
+
     const char *start_c = RedisModule_StringPtrLen(start, NULL);
     const char *end_c = RedisModule_StringPtrLen(end, NULL);
 
@@ -208,7 +211,6 @@ int job_query_match_job(const job_query_t qry, long long job)
     }
 #endif
 
-    RedisModule_CloseKey(jobkey);
     return QUERY_PASS;
 }
 
