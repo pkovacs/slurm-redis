@@ -97,7 +97,7 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     // Create or update the index
     long long end_days = end_time / SECONDS_PER_DAY;
     RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
-        "%s:idx:%lld:end", prefix, end_days);
+        "%s:idx:end:%lld", prefix, end_days);
     reply = RedisModule_Call(ctx, "SADD", "sc", idx, jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
         RedisModule_ReplyWithCallReply(ctx, reply);
@@ -153,7 +153,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         const char *job_c;
         RedisModuleCallReply *reply;
         RedisModuleString *idx = RedisModule_CreateStringPrintf(ctx,
-            "%s:idx:%lld:end", prefix, day);
+            "%s:idx:end:%lld", prefix, day);
         sscan_cursor_init_t init = {
             .ctx = ctx,
             .set = idx,
