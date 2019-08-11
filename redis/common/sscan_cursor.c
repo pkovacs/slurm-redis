@@ -81,15 +81,14 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     // Fetch the array of values on the second element; can be NULL
     cursor->subreply_array = RedisModule_CallReplyArrayElement(cursor->reply,
         1);
-    if (cursor->subreply_array &&
-            (RedisModule_CallReplyType(cursor->subreply_array)
-        != REDISMODULE_REPLY_ARRAY)) {
-        cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
-            REDISMODULE_ERRORMSG_WRONGTYPE);
-        return;
-    } else if (cursor->subreply_array) {
-        cursor->array_sz =
-            RedisModule_CallReplyLength(cursor->subreply_array);
+    if (cursor->subreply_array) {
+        if (RedisModule_CallReplyType(cursor->subreply_array)
+            != REDISMODULE_REPLY_ARRAY) {
+            cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
+                REDISMODULE_ERRORMSG_WRONGTYPE);
+            return;
+        }
+        cursor->array_sz = RedisModule_CallReplyLength(cursor->subreply_array);
     }
 
     // Convert the string cursor value to an integer
@@ -190,11 +189,6 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
                 cursor->array_ix);
         if (subreply_element && ret) {
             *ret = RedisModule_CallReplyStringPtr(subreply_element, len);
-        } else if (ret) {
-            *ret = NULL;
-            if (len) {
-                *len = 0;
-            }
         }
         ++cursor->array_ix;
     }

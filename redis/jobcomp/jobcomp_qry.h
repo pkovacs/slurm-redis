@@ -33,6 +33,14 @@
  * An abstract data type corresponding to slurm's slurmdb_job_cond_t
  */
 
+enum {
+    QUERY_ERR = -2,
+    QUERY_NULL = -1,
+    QUERY_OK = 0,
+    QUERY_PASS = 1,
+    QUERY_FAIL = 2
+};
+
 // A job query is an opaque pointer
 typedef struct job_query *job_query_t;
 
@@ -49,13 +57,19 @@ job_query_t create_job_query(const job_query_init_t *init);
 // Destroy a job query
 void destroy_job_query(job_query_t *qry);
 
+// Prepare the job query
+int job_query_prepare(job_query_t qry);
+
+// Return last error and error size byref, integer status (enum)
+int job_query_error(job_query_t qry, const char **err, size_t *len);
+
 // Check if a job matches job query criteria
 int job_query_match_job(const job_query_t qry, long long job);
 
 // Return integer start day for query
-long long job_query_start_day(const job_query_t qry);
+int job_query_start_day(const job_query_t qry, long long *start);
 
 // Return integer end day for query
-long long job_query_end_day(const job_query_t qry);
+int job_query_end_day(const job_query_t qry, long long *end);
 
 #endif /* JOBCOMP_QRY_H */

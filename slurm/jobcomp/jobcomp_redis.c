@@ -346,8 +346,8 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     }
 
     // Ask the redis server for matches to the criteria
-    redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
-    ++pipeline;
+    //redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
+    //++pipeline;
 
     // Pop the pipeline replies.  The only thing we care about is the name of
     // the match set on the last reply
@@ -370,6 +370,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     }
     pipeline = 0;
 
+    return NULL;
     // Next we need to pull down the match set which contains only the job ids
     // of the matching jobs.  We then run successive pipelines of requests for
     // full job completion data and build the jobcomp_job_rec_t list that slurm

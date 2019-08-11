@@ -176,8 +176,10 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
             if (len) {
                 *len = cursor->subreply_array->element[cursor->array_ix]->len;
             }
-        } else if (ret) {
-            *ret = NULL;
+        } else if (ret || len) {
+            if (ret) {
+                *ret = NULL;
+            }
             if (len) {
                 *len = 0;
             }
