@@ -33,6 +33,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "common/iso8601_format.h"
@@ -235,18 +236,11 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return RedisModule_WrongArity(ctx);
     }
 
- RedisModule_ReplyWithArray(ctx,REDISMODULE_POSTPONED_ARRAY_LEN);
- RedisModule_ReplyWithLongLong(ctx,1);
- RedisModule_ReplyWithArray(ctx,REDISMODULE_POSTPONED_ARRAY_LEN);
- RedisModule_ReplyWithLongLong(ctx,10);
- RedisModule_ReplyWithLongLong(ctx,20);
- RedisModule_ReplyWithLongLong(ctx,30);
- RedisModule_ReplySetArrayLength(ctx,3); // Set len of 10,20,30 array.
- RedisModule_ReplySetArrayLength(ctx,2); // Set len of top arra
-#if 0
+    long long max_count;
     const char *prefix = RedisModule_StringPtrLen(argv[1], NULL);
     const char *uuid = RedisModule_StringPtrLen(argv[2], NULL);
-    long long max_count;
+    RedisModuleString *match = RedisModule_CreateStringPrintf(ctx, "%s:mat:%s",
+        prefix, uuid);
 
     if (RedisModule_StringToLongLong(argv[3], &max_count) != REDISMODULE_OK) {
         RedisModule_ReplyWithError(ctx, "invalid max count");
@@ -255,50 +249,31 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     if (max_count > FETCH_MAX_COUNT) {
         max_count = FETCH_MAX_COUNT;
     }
-
-    RedisModuleString *match = RedisModule_CreateStringPrintf(ctx, "%s:mat:%s",
-        prefix, uuid);
-
-    int i;
-    long long count = 0;
-    const char *job_c = NULL;
-    RedisModuleCallReply *reply;
-    RedisModuleString *fields[MAX_REDIS_FIELDS];
     RedisModule_ReplyWithArray(ctx, REDISMODULE_POSTPONED_ARRAY_LEN);
-    do {
-        reply = RedisModule_Call(ctx, "SPOP", "s", match);
-        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
-            RedisModule_ReplyWithCallReply(ctx, reply);
-            return REDISMODULE_ERR;
+
+    long long count = 0;
+    while (count < max_count) {
+        RedisModuleString *fields[MAX_REDIS_FIELDS];
+        memset(fields, 0, sizeof(fields));
+        RedisModuleCallReply *reply = RedisModule_Call(ctx, "SPOP", "s", match);
+        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) {
+            break;
         }
-        job_c = RedisModule_CallReplyStringPtr(reply, NULL);
-        if (!job_c) {
-            continue;
-        }
+        const char *job_c = RedisModule_CallReplyStringPtr(reply, NULL);
         long long job = strtoll(job_c, NULL, 10);
         if ((errno == ERANGE &&
                 (job == LLONG_MAX || job == LLONG_MIN))
             || (errno != 0 && job == 0)) {
-            RedisModule_ReplyWithError(ctx, "invalid job id");
-            return REDISMODULE_ERR;
-        }
-
-        RedisModule_Log(ctx, "notice", "job %lld, count %lld", job, count);
-
-        RedisModuleString *key_s = RedisModule_CreateStringPrintf(ctx,
-            "%s:%lld", prefix, job);
-        RedisModuleKey *key = RedisModule_OpenKey(ctx, key_s, REDISMODULE_READ);
-        if (RedisModule_KeyType(key) == REDISMODULE_KEYTYPE_EMPTY) {
-            RedisModule_CloseKey(key);
             continue;
         }
-        if (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_HASH) {
-            RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
-            return REDISMODULE_ERR;
+        RedisModuleString *job_key_s = RedisModule_CreateStringPrintf(ctx,
+            "%s:%lld", prefix, job);
+        RedisModuleKey *job_key = RedisModule_OpenKey(ctx, job_key_s,
+            REDISMODULE_READ);
+        if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
+            continue;
         }
-
-        RedisModule_ReplyWithArray(ctx, MAX_REDIS_FIELDS);
-        if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS,
+        if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
             redis_field_labels[0], &fields[0],
             redis_field_labels[1], &fields[1],
             redis_field_labels[2], &fields[2],
@@ -327,19 +302,18 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             redis_field_labels[25], &fields[25],
             redis_field_labels[26], &fields[26],
             NULL) == REDISMODULE_ERR) {
-                RedisModule_ReplyWithError(ctx, "error fetching job data");
-                return REDISMODULE_ERR;
+                continue;
         }
-        for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
-            RedisModule_ReplyWithString(ctx, fields[i]);
-            if (fields[i]) {
-                RedisModule_FreeString(ctx, fields[i]);
-            }
+        RedisModule_ReplyWithArray(ctx, MAX_REDIS_FIELDS);
+        int i = 0;
+        for (; i < MAX_REDIS_FIELDS; ++i) {
+            if (fields[i])
+                RedisModule_ReplyWithString(ctx, fields[i]);
+            else
+                RedisModule_ReplyWithNull(ctx);
         }
         ++count;
-    } while (job_c && (count <= max_count));
-
+    }
     RedisModule_ReplySetArrayLength(ctx, count);
-#endif
     return REDISMODULE_OK;
 }
