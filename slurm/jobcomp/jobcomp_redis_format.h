@@ -39,10 +39,10 @@
  * itemizes the data that a jobcomp plugin manages.
  *
 typedef struct {
- *  uint32_t jobid;       // JobID      +
+ x  uint32_t jobid;       // JobID      +
  *  char *partition;      // Partition  +
- *  char *start_time;     // Start      +
- *  char *end_time;       // End        +
+ x  char *start_time;     // Start      +
+ x  char *end_time;       // End        +
  *  time_t elapsed_time;  // Elapsed    +
  *  uint32_t uid;         // UID        +
  *  char *uid_name;       // User       +

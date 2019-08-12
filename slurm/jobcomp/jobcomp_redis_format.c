@@ -30,9 +30,13 @@
 #include "jobcomp_redis_format.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#include <src/common/parse_time.h> /* slurm_make_time_str, ... */
 #include <src/common/uid.h> /* uid_to_string, ... */
 #include <src/common/xmalloc.h> /* xmalloc, ... */
 #include <src/common/xstring.h> /* xstrdup, ... */
@@ -229,6 +233,48 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
 {
     assert(fields != NULL);
     assert(job != NULL);
+
+    char buf[32];
+    *job = xmalloc(sizeof(jobcomp_job_rec_t));
+
+    unsigned long jobid = strtoul(fields->value[kJobID], NULL, 10);
+    if ((errno == ERANGE && (jobid == ULONG_MAX))
+        || (errno != 0 && jobid == 0)) {
+        return SLURM_ERROR;
+    }
+    (*job)->jobid = (uint32_t)jobid;
+    (*job)->partition = xstrdup(fields->value[kPartition]);
+
+#ifdef ISO8601_DATES
+    // We store the date/time in redis as iso8601 w/tz "Z" (Zero/Zulu),
+    // so first use our mk_time function to convert it back to time_t,
+    // then use slurm_make_time_str to format it for slurm
+    time_t start_time = mk_time(fields->value[kStart]);
+    time_t end_time = mk_time(fields->value[kEnd]);
+    slurm_make_time_str(&start_time, buf, sizeof(buf));
+    (*job)->start_time = xstrdup(buf);
+    slurm_make_time_str(&end_time, buf, sizeof(buf));
+    (*job)->end_time = xstrdup(buf);
+#else
+    // We store the date/time in redis as an integer string (epoch time),
+    // so just convert it to a time_t, then use slurm_make_time_str
+    long int t = strtol(fields->value[kStart], NULL, 10);
+    if ((errno == ERANGE &&
+            ((t == LONG_MAX) || (t == LONG_MIN)))
+        || (errno != 0 && t == 0)) {
+        return SLURM_ERROR;
+    }
+    time_t start_time = (time_t)t;
+    slurm_make_time_str(&start_time, buf, sizeof(buf));
+    t = strtol(fields->value[kEnd], NULL, 10);
+    if ((errno == ERANGE &&
+            ((t == LONG_MAX) || (t == LONG_MIN)))
+        || (errno != 0 && t == 0)) {
+        return SLURM_ERROR;
+    }
+    time_t end_time = (time_t)t;
+    slurm_make_time_str(&end_time, buf, sizeof(buf));
+#endif
     return SLURM_SUCCESS;
 }
 

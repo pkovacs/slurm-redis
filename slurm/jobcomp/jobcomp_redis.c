@@ -172,7 +172,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         // TODO: e.g. we MUST have fields->value[kJobID]
     }
 
-    // Add the job's field-value pairs to a new redis key
+    // Add the job's field-value pairs to a redis hash set
     int i = 0, pipeline = 0;
     for (; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
@@ -183,17 +183,16 @@ int slurm_jobcomp_log_record(struct job_record *job)
         }
     }
 
-    // Index the job on the redis server
-    redisAppendCommand(ctx, "SLURMJC.INDEX %s %s",
-        prefix, fields->value[kJobID]);
+    // Use SLURMJC.INDEX to index the job on the redis server
+    redisAppendCommand(ctx, "SLURMJC.INDEX %s %s", prefix,
+        fields->value[kJobID]);
     ++pipeline;
 
     // Pop the pipeline replies
-    redisReply *reply;
     for (i = 0; i < pipeline; ++i) {
+        redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
         freeReplyObject(reply);
-        reply = NULL;
     }
 
     // Free Mars
@@ -250,6 +249,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     char uuid_s[37];
     char key[128];
     uuid_t uuid;
+    List job_list = list_create(jobcomp_destroy_job);
 
     // Generate a random uuid for the query keys
     uuid_generate(uuid);
@@ -316,7 +316,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     }
 
     if (!have_matches) {
-        return NULL;
+        return job_list;
     }
 
     // Use SLURMJC.FETCH to pull down the matching jobs in chunks and build
@@ -333,6 +333,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         size_t i = 0;
         for (; i < reply->elements; ++i) {
             size_t j = 0;
+            jobcomp_job_rec_t *job = NULL;
             redisReply *subreply = reply->element[i];
             for (; j < subreply->elements; ++j) {
                 if (subreply->element[j]->type == REDIS_REPLY_STRING) {
@@ -342,11 +343,15 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
                 }
             }
             slurm_debug("Job ID %s match", fields.value[kJobID]);
+            if (jobcomp_redis_format_job(&fields, &job) != SLURM_SUCCESS) {
+                continue;
+            }
+            list_append(job_list, job);
         }
         freeReplyObject(reply);
     } while (1);
 
-    return NULL;
+    return job_list;
 }
 
 int slurm_jobcomp_get_errno(void)
