@@ -294,19 +294,18 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
-    // Ask the redis server for matches to the criteria
+    // Use SLURMJC.MATCH to create a match set for the job criteria
     redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
     ++pipeline;
 
-    // Pop the pipeline replies.  The reply to SLURMJC.MATCH is the name of the
-    // set that redis created containing matching job ids.  We only really care
-    // whether or not the length of that name string is > 0.
-    redisReply *reply;
+    // The last reply in the pipeline is for the SLURMJC.MATCH command above
+    // and contains the name of the match set
     int i = 0, have_matches = 0;
     for (; i < pipeline; ++i) {
+        redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
         if (i == pipeline-1) {
-            if (reply->type == REDIS_REPLY_STRING && reply->str) {
+            if (reply && (reply->type == REDIS_REPLY_STRING)) {
                 slurm_debug("redis job matches found (%s)", reply->str);
                 have_matches = reply->len;
             } else {
@@ -314,9 +313,38 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
             }
         }
         freeReplyObject(reply);
-        reply = NULL;
     }
-    pipeline = 0;
+
+    if (!have_matches) {
+        return NULL;
+    }
+
+    // Use SLURMJC.FETCH to pull down the matching jobs in chunks and build
+    // the return list that slurm needs
+    do {
+        redis_fields_t fields;
+        redisReply *reply = redisCommand(ctx, "SLURMJC.FETCH %s %s 500",
+            prefix, uuid_s);
+        if ((reply->type == REDIS_REPLY_NIL) ||
+            (reply->type != REDIS_REPLY_ARRAY) ||
+            (reply->elements == 0)) {
+            break;
+        }
+        size_t i = 0;
+        for (; i < reply->elements; ++i) {
+            size_t j = 0;
+            redisReply *subreply = reply->element[i];
+            for (; j < subreply->elements; ++j) {
+                if (subreply->element[j]->type == REDIS_REPLY_STRING) {
+                    fields.value[j] = subreply->element[j]->str;
+                } else {
+                    fields.value[j] = NULL;
+                }
+            }
+            slurm_debug("Job ID %s match", fields.value[kJobID]);
+        }
+        freeReplyObject(reply);
+    } while (1);
 
     return NULL;
 }
