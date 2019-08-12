@@ -188,7 +188,10 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                    return REDISMODULE_ERR;
                 }
                 if (job_match == QUERY_PASS) {
-                    reply = RedisModule_Call(ctx, "SADD", "sl", match_set, job);
+                    // Add ijob to sorted set with score = job so that we can
+                    // pop them off later in job sorted order
+                    reply = RedisModule_Call(ctx, "ZADD", "sll", match_set,
+                        job, job);
                     RedisModule_FreeCallReply(reply);
                 }
             }
@@ -201,7 +204,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithNull(ctx);
         return REDISMODULE_OK;
     }
-    if (RedisModule_KeyType(match_set_key) != REDISMODULE_KEYTYPE_SET) {
+    if (RedisModule_KeyType(match_set_key) != REDISMODULE_KEYTYPE_ZSET) {
         RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
         return REDISMODULE_ERR;
     }
@@ -255,64 +258,73 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     while (count < max_count) {
         RedisModuleString *fields[MAX_REDIS_FIELDS];
         memset(fields, 0, sizeof(fields));
-        RedisModuleCallReply *reply = RedisModule_Call(ctx, "SPOP", "s", match);
-        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) {
+        RedisModuleCallReply *reply = RedisModule_Call(ctx, "ZPOPMIN", "sl",
+            match, 100);
+        if ((RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) ||
+            (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_ARRAY) ||
+            (RedisModule_CallReplyLength(reply)) == 0) {
             break;
         }
-        const char *job_c = RedisModule_CallReplyStringPtr(reply, NULL);
-        long long job = strtoll(job_c, NULL, 10);
-        if ((errno == ERANGE &&
-                (job == LLONG_MAX || job == LLONG_MIN))
-            || (errno != 0 && job == 0)) {
-            continue;
-        }
-        RedisModuleString *job_key_s = RedisModule_CreateStringPrintf(ctx,
-            "%s:%lld", prefix, job);
-        RedisModuleKey *job_key = RedisModule_OpenKey(ctx, job_key_s,
-            REDISMODULE_READ);
-        if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
-            continue;
-        }
-        if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
-            redis_field_labels[0], &fields[0],
-            redis_field_labels[1], &fields[1],
-            redis_field_labels[2], &fields[2],
-            redis_field_labels[3], &fields[3],
-            redis_field_labels[4], &fields[4],
-            redis_field_labels[5], &fields[5],
-            redis_field_labels[6], &fields[6],
-            redis_field_labels[7], &fields[7],
-            redis_field_labels[8], &fields[8],
-            redis_field_labels[9], &fields[9],
-            redis_field_labels[10], &fields[10],
-            redis_field_labels[11], &fields[11],
-            redis_field_labels[12], &fields[12],
-            redis_field_labels[13], &fields[13],
-            redis_field_labels[14], &fields[14],
-            redis_field_labels[15], &fields[15],
-            redis_field_labels[16], &fields[16],
-            redis_field_labels[17], &fields[17],
-            redis_field_labels[18], &fields[18],
-            redis_field_labels[19], &fields[19],
-            redis_field_labels[20], &fields[20],
-            redis_field_labels[21], &fields[21],
-            redis_field_labels[22], &fields[22],
-            redis_field_labels[23], &fields[23],
-            redis_field_labels[24], &fields[24],
-            redis_field_labels[25], &fields[25],
-            redis_field_labels[26], &fields[26],
-            NULL) == REDISMODULE_ERR) {
+        size_t s = 0;
+        for (; (s < RedisModule_CallReplyLength(reply)) && (count < max_count);
+            s += 2) {
+            RedisModuleCallReply *subreply =
+                RedisModule_CallReplyArrayElement(reply, s);
+            const char *job_c = RedisModule_CallReplyStringPtr(subreply, NULL);
+            long long job = strtoll(job_c, NULL, 10);
+            if ((errno == ERANGE &&
+                    (job == LLONG_MAX || job == LLONG_MIN))
+                || (errno != 0 && job == 0)) {
                 continue;
+            }
+            RedisModuleString *job_key_s = RedisModule_CreateStringPrintf(ctx,
+                "%s:%lld", prefix, job);
+            RedisModuleKey *job_key = RedisModule_OpenKey(ctx, job_key_s,
+                REDISMODULE_READ);
+            if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
+                continue;
+            }
+            if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
+                redis_field_labels[0], &fields[0],
+                redis_field_labels[1], &fields[1],
+                redis_field_labels[2], &fields[2],
+                redis_field_labels[3], &fields[3],
+                redis_field_labels[4], &fields[4],
+                redis_field_labels[5], &fields[5],
+                redis_field_labels[6], &fields[6],
+                redis_field_labels[7], &fields[7],
+                redis_field_labels[8], &fields[8],
+                redis_field_labels[9], &fields[9],
+                redis_field_labels[10], &fields[10],
+                redis_field_labels[11], &fields[11],
+                redis_field_labels[12], &fields[12],
+                redis_field_labels[13], &fields[13],
+                redis_field_labels[14], &fields[14],
+                redis_field_labels[15], &fields[15],
+                redis_field_labels[16], &fields[16],
+                redis_field_labels[17], &fields[17],
+                redis_field_labels[18], &fields[18],
+                redis_field_labels[19], &fields[19],
+                redis_field_labels[20], &fields[20],
+                redis_field_labels[21], &fields[21],
+                redis_field_labels[22], &fields[22],
+                redis_field_labels[23], &fields[23],
+                redis_field_labels[24], &fields[24],
+                redis_field_labels[25], &fields[25],
+                redis_field_labels[26], &fields[26],
+                NULL) == REDISMODULE_ERR) {
+                    continue;
+            }
+            RedisModule_ReplyWithArray(ctx, MAX_REDIS_FIELDS);
+            int i = 0;
+            for (; i < MAX_REDIS_FIELDS; ++i) {
+                if (fields[i])
+                    RedisModule_ReplyWithString(ctx, fields[i]);
+                else
+                    RedisModule_ReplyWithNull(ctx);
+            }
+            ++count;
         }
-        RedisModule_ReplyWithArray(ctx, MAX_REDIS_FIELDS);
-        int i = 0;
-        for (; i < MAX_REDIS_FIELDS; ++i) {
-            if (fields[i])
-                RedisModule_ReplyWithString(ctx, fields[i]);
-            else
-                RedisModule_ReplyWithNull(ctx);
-        }
-        ++count;
     }
     RedisModule_ReplySetArrayLength(ctx, count);
     return REDISMODULE_OK;
