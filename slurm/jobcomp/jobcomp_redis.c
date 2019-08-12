@@ -38,7 +38,6 @@
 #include <src/common/xstring.h> /* xstrdup, ... */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
-#include "slurm/common/sscan_cursor.h"
 #include "jobcomp_redis_format.h"
 
 #define USER_CACHE_SZ 64
@@ -100,56 +99,6 @@ static int redis_add_job_criteria(const char *key, const List list) {
     ++pipeline;
     list_iterator_destroy(it);
     return pipeline;
-}
-
-static int redis_request_job_data(const char *job)
-{
-    // HMGET gives us the ordering guarantee we want for the reply array.
-    // Using HGETALL is briefer on this end, but the returned array contains
-    // the field labels anyway and the order of label/values is unknown, so
-    // we would be forced to inspect each label.  This longer command gives
-    // us a reply from redis with no labels and in the order we prescribe
-    redisAppendCommand(ctx, "HMGET %s:%s %s %s %s %s %s %s %s %s %s %s "
-        "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s ", prefix, job,
-        redis_field_labels[0], redis_field_labels[1], redis_field_labels[2], redis_field_labels[3],
-        redis_field_labels[4], redis_field_labels[5], redis_field_labels[6], redis_field_labels[7],
-        redis_field_labels[8], redis_field_labels[9], redis_field_labels[10], redis_field_labels[11],
-        redis_field_labels[12], redis_field_labels[13], redis_field_labels[14], redis_field_labels[15],
-        redis_field_labels[16], redis_field_labels[17], redis_field_labels[18], redis_field_labels[19],
-        redis_field_labels[20], redis_field_labels[21], redis_field_labels[22], redis_field_labels[23],
-        redis_field_labels[24], redis_field_labels[25], redis_field_labels[26]);
-    return 1;
-}
-
-static void redis_receive_jobs(int pipeline)
-{
-    redisReply *reply;
-    int i = 0;
-    for (; i < pipeline; ++i) {
-        redisGetReply(ctx, (void **)&reply);
-        switch (reply->type) {
-            case REDIS_REPLY_ARRAY:
-            {
-                // We can use the stack here and set the reply data pointers
-                // into the redis_fields_t with no memory allocation cost
-                redis_fields_t fields;
-                int j = 0;
-                for (; j < MAX_REDIS_FIELDS; ++j) {
-                    fields.value[j] = reply->element[j]->str;
-                }
-                slurm_debug("JobID=%s Partition=%s Start=%s End=%s",
-                    fields.value[kJobID], fields.value[kPartition],
-                    fields.value[kStart], fields.value[kEnd]);
-                break;
-            }
-            case REDIS_REPLY_ERROR:
-                break;
-            default:
-                break;
-        }
-        freeReplyObject(reply);
-        reply = NULL;
-    }
 }
 
 int init(void)
@@ -346,66 +295,28 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     }
 
     // Ask the redis server for matches to the criteria
-    //redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
-    //++pipeline;
+    redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
+    ++pipeline;
 
-    // Pop the pipeline replies.  The only thing we care about is the name of
-    // the match set on the last reply
-    char *set = NULL;
+    // Pop the pipeline replies.  The reply to SLURMJC.MATCH is the name of the
+    // set that redis created containing matching job ids.  We only really care
+    // whether or not the length of that name string is > 0.
     redisReply *reply;
-    int i = 0;
+    int i = 0, have_matches = 0;
     for (; i < pipeline; ++i) {
         redisGetReply(ctx, (void **)&reply);
         if (i == pipeline-1) {
             if (reply->type == REDIS_REPLY_STRING && reply->str) {
-                set = xstrdup(reply->str);
+                slurm_debug("redis job matches found (%s)", reply->str);
+                have_matches = reply->len;
+            } else {
+                slurm_debug("redis job matches not found");
             }
         }
         freeReplyObject(reply);
         reply = NULL;
     }
-    slurm_debug("redis match set: %s", set ? set : "(null)");
-    if (!set) {
-        return NULL;
-    }
     pipeline = 0;
-
-    return NULL;
-    // Next we need to pull down the match set which contains only the job ids
-    // of the matching jobs.  We then run successive pipelines of requests for
-    // full job completion data and build the jobcomp_job_rec_t list that slurm
-    // requires
-
-    int rc;
-    const char *element, *err;
-    size_t element_sz, err_sz;
-    sscan_cursor_init_t init = {
-        .ctx = ctx,
-        .set = set,
-        .count = 500
-    };
-    AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
-        create_sscan_cursor(&init);
-    if (sscan_error(cursor, &err, &err_sz) == SSCAN_ERR) {
-        return NULL;
-    }
-    do {
-        // We must enter the cursor with no open pipeline. We can build
-        // a pipeline as we loop, until we get SSCAN_PIPELINE which is a
-        // warning that the next iteration will not be pipeline friendly
-        rc = sscan_next_element(cursor, &element, &element_sz);
-        if (rc == SSCAN_ERR) {
-            sscan_error(cursor, &err, &err_sz);
-            return NULL;
-        }
-        if ((rc == SSCAN_OK || rc == SSCAN_PIPELINE) && element) {
-            pipeline += redis_request_job_data(element);
-        }
-        if (rc == SSCAN_PIPELINE) {
-            redis_receive_jobs(pipeline);
-            pipeline = 0;
-        }
-    } while (rc != SSCAN_EOF);
 
     return NULL;
 }

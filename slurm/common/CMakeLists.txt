@@ -23,8 +23,6 @@
 #
 
 add_library(slurm_common OBJECT
-    sscan_cursor.c
-    sscan_cursor.h
     ttl_hash.c
     ttl_hash.h
 )
@@ -35,11 +33,6 @@ set_target_properties(slurm_common
     POSITION_INDEPENDENT_CODE ON
 )
 
-target_compile_options(slurm_common
-    PRIVATE ${HIREDIS_CFLAGS_OTHER}
-)
-
 target_include_directories(slurm_common
-    PRIVATE ${HIREDIS_INCLUDE_DIRS}
     PRIVATE ${SLURM_SOURCE_DIR}
 )
