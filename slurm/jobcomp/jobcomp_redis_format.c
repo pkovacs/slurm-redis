@@ -243,7 +243,14 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     assert(fields != NULL);
     assert(job != NULL);
 
+    unsigned long _tmf;
+
     *job = xmalloc(sizeof(jobcomp_job_rec_t));
+
+    // Format of date/time FROM redis is run-time selected via the _tmf field
+    if (sr_strtoul(fields->value[kTimeFormat], &_tmf) < 0) {
+        return SLURM_ERROR;
+    }
 
     {
         unsigned long jobid;
@@ -255,11 +262,10 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
 
     (*job)->partition = xstrdup(fields->value[kPartition]);
 
-#ifdef ISO8601_DATES
-    // We store the date/time in redis as iso8601 w/tz "Z" (Zero/Zulu),
-    // so first use our mk_time function to convert it back to time_t,
-    // then use slurm_make_time_str to format it for slurm
-    {
+    if (_tmf == 1) {
+        // The date/time in redis was an iso8601 string w/tz "Z" (Zero/Zulu),
+        // so first use our mk_time function to convert it back to time_t,
+        // then use slurm_make_time_str to format it for slurm
         char buf[32];
         time_t start_time = mk_time(fields->value[kStart]);
         time_t end_time = mk_time(fields->value[kEnd]);
@@ -273,11 +279,9 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
         (*job)->submit_time = xstrdup(buf);
         slurm_make_time_str(&eligible_time, buf, sizeof(buf));
         (*job)->eligible_time = xstrdup(buf);
-    }
-#else
-    // We store the date/time in redis as an integer string (epoch time),
-    // so just convert it to a time_t, then use slurm_make_time_str
-    {
+    } else {
+        // The date/time in redis was an integer string (epoch time),
+        // so convert it to a time_t, then use slurm_make_time_str
         char buf[32];
         time_t start_time, end_time, submit_time, eligible_time;
         if (sr_strtol(fields->value[kStart], &start_time) < 0) {
@@ -301,7 +305,7 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
         slurm_make_time_str(&eligible_time, buf, sizeof(buf));
         (*job)->eligible_time = xstrdup(buf);
     }
-#endif
+
     {
         long elapsed_time;
         if (sr_strtol(fields->value[kElapsed], &elapsed_time) < 0) {
@@ -363,6 +367,9 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
 
 char *jobcomp_redis_format_time(time_t t)
 {
+// Format of date/time TO redis is compile-time selected for now
+// via the -DISO8601_DATES=ON/OFF option
+
 #ifdef ISO8601_DATES
     char *buf = xmalloc(ISO8601_SZ);
     if (!mk_iso8601(t, buf)) {

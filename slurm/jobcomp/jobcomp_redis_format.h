@@ -106,7 +106,7 @@ int jobcomp_redis_format_fields(const struct job_record *job,
 int jobcomp_redis_format_job(const redis_fields_t *fields,
     jobcomp_job_rec_t **job);
 
-// Format time_t into string (-DISO8601_DATES=ON/OFF option)
+// Format time_t into string for redis
 char *jobcomp_redis_format_time(time_t t);
 
 #endif /* JOBCOMP_REDIS_FORMAT_H */
