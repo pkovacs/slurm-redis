@@ -30,9 +30,8 @@
 #include "sscan_cursor.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <limits.h>
-#include <stdlib.h>
+
+#include "common/stringto.h"
 
 typedef struct sscan_cursor {
     RedisModuleCtx *ctx;
@@ -92,11 +91,8 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     }
 
     // Convert the string cursor value to an integer
-    cursor->value = strtoll(RedisModule_CallReplyStringPtr(subreply_cursor,
-        NULL), NULL, 10);
-    if ((errno == ERANGE &&
-            (cursor->value == LLONG_MAX || cursor->value == LLONG_MIN))
-        || (errno != 0 && cursor->value == 0)) {
+    if (sr_strtoll(RedisModule_CallReplyStringPtr(subreply_cursor, NULL),
+        &cursor->value) < 0) {
         cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
             "invalid cursor"); 
         return;

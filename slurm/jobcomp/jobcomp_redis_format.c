@@ -30,9 +30,6 @@
 #include "jobcomp_redis_format.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <limits.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -44,6 +41,7 @@
 #ifdef ISO8601_DATES
 #include "common/iso8601_format.h"
 #endif
+#include "common/stringto.h"
 #include "common/ttl_hash.h"
 
 static ttl_hash_t user_cache = NULL;
@@ -248,9 +246,8 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     *job = xmalloc(sizeof(jobcomp_job_rec_t));
 
     {
-        unsigned long jobid = strtoul(fields->value[kJobID], NULL, 10);
-        if ((errno == ERANGE && (jobid == ULONG_MAX))
-            || (errno != 0 && jobid == 0)) {
+        unsigned long jobid;
+        if (sr_strtoul(fields->value[kJobID], &jobid) < 0) {
             return SLURM_ERROR;
         }
         (*job)->jobid = (uint32_t)jobid;
@@ -283,58 +280,39 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     {
         char buf[32];
         time_t start_time, end_time, submit_time, eligible_time;
-        long time_i = strtol(fields->value[kStart], NULL, 10);
-        if ((errno == ERANGE &&
-                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
-            || (errno != 0 && time_i == 0)) {
+        if (sr_strtol(fields->value[kStart], &start_time) < 0) {
             return SLURM_ERROR;
         }
-        start_time = (time_t)time_i;
+        if (sr_strtol(fields->value[kEnd], &end_time) < 0) {
+            return SLURM_ERROR;
+        }
+        if (sr_strtol(fields->value[kSubmit], &submit_time) < 0) {
+            return SLURM_ERROR;
+        }
+        if (sr_strtol(fields->value[kEligible], &eligible_time) < 0) {
+            return SLURM_ERROR;
+        }
         slurm_make_time_str(&start_time, buf, sizeof(buf));
         (*job)->start_time = xstrdup(buf);
-        time_i = strtol(fields->value[kEnd], NULL, 10);
-        if ((errno == ERANGE &&
-                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
-            || (errno != 0 && time_i == 0)) {
-            return SLURM_ERROR;
-        }
-        end_time = (time_t)time_i;
-        (*job)->end_time = xstrdup(buf);
         slurm_make_time_str(&end_time, buf, sizeof(buf));
-        time_i = strtol(fields->value[kSubmit], NULL, 10);
-        if ((errno == ERANGE &&
-                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
-            || (errno != 0 && time_i == 0)) {
-            return SLURM_ERROR;
-        }
-        submit_time = (time_t)time_i;
+        (*job)->end_time = xstrdup(buf);
         slurm_make_time_str(&submit_time, buf, sizeof(buf));
         (*job)->submit_time = xstrdup(buf);
-        time_i = strtol(fields->value[kEligible], NULL, 10);
-        if ((errno == ERANGE &&
-                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
-            || (errno != 0 && time_i == 0)) {
-            return SLURM_ERROR;
-        }
-        eligible_time = (time_t)time_i;
         slurm_make_time_str(&eligible_time, buf, sizeof(buf));
         (*job)->eligible_time = xstrdup(buf);
     }
 #endif
     {
-        long time_i = strtol(fields->value[kElapsed], NULL, 10);
-        if ((errno == ERANGE &&
-                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
-            || (errno != 0 && time_i == 0)) {
+        long elapsed_time;
+        if (sr_strtol(fields->value[kElapsed], &elapsed_time) < 0) {
             return SLURM_ERROR;
         }
-        (*job)->elapsed_time = (time_t)time_i;
+        (*job)->elapsed_time = (time_t)elapsed_time;
     }
 
     {
-        unsigned long uid = strtoul(fields->value[kUID], NULL, 10);
-        if ((errno == ERANGE && (uid == ULONG_MAX))
-            || (errno != 0 && uid == 0)) {
+        unsigned long uid;
+        if (sr_strtoul(fields->value[kUID], &uid) < 0) {
             return SLURM_ERROR;
         }
         (*job)->uid = (uint32_t)uid;
@@ -342,9 +320,8 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     }
 
     {
-        unsigned long gid = strtoul(fields->value[kGID], NULL, 10);
-        if ((errno == ERANGE && (gid == ULONG_MAX))
-            || (errno != 0 && gid == 0)) {
+        unsigned long gid;
+        if (sr_strtoul(fields->value[kGID], &gid) < 0) {
             return SLURM_ERROR;
         }
         (*job)->gid = (uint32_t)gid;
@@ -352,18 +329,16 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     }
 
     {
-        unsigned long nnodes = strtoul(fields->value[kNNodes], NULL, 10);
-        if ((errno == ERANGE && (nnodes == ULONG_MAX))
-            || (errno != 0 && nnodes == 0)) {
+        unsigned long nnodes;
+        if (sr_strtoul(fields->value[kNNodes], &nnodes) < 0) {
             return SLURM_ERROR;
         }
         (*job)->node_cnt = (uint32_t)nnodes;
     }
 
     {
-        unsigned long ncpus = strtoul(fields->value[kNCPUs], NULL, 10);
-        if ((errno == ERANGE && (ncpus == ULONG_MAX))
-            || (errno != 0 && ncpus == 0)) {
+        unsigned long ncpus;
+        if (sr_strtoul(fields->value[kNCPUs], &ncpus) < 0) {
             return SLURM_ERROR;
         }
         (*job)->proc_cnt = (uint32_t)ncpus;

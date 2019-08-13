@@ -29,16 +29,13 @@
 
 #include "jobcomp_cmd.h"
 
-#include <errno.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #include "common/iso8601_format.h"
 #include "common/redis_fields.h"
 #include "common/sscan_cursor.h"
+#include "common/stringto.h"
 #include "jobcomp_qry.h"
 
 #define FETCH_MAX_COUNT 500
@@ -86,10 +83,7 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return REDISMODULE_ERR;
     }
 #else
-    end_time = strtoll(RedisModule_StringPtrLen(end, NULL), NULL, 10);
-    if ((errno == ERANGE &&
-            (end_time == LLONG_MAX || end_time == LLONG_MIN))
-        || (errno != 0 && end_time == 0)) {
+    if (sr_strtoll(RedisModule_StringPtrLen(end, NULL), &end_time) < 0) {
         RedisModule_ReplyWithError(ctx, "invalid end date/time");
         return REDISMODULE_ERR;
     }
@@ -174,10 +168,8 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                 return REDISMODULE_ERR;
             }
             if ((rc == SSCAN_OK) && *job_c) {
-                long long job = strtoll(job_c, NULL, 10);
-                if ((errno == ERANGE &&
-                        (job == LLONG_MAX || job == LLONG_MIN))
-                    || (errno != 0 && job == 0)) {
+                long long job;
+                if (sr_strtoll(job_c, &job) < 0) {
                     RedisModule_ReplyWithError(ctx, "invalid job id");
                     return REDISMODULE_ERR;
                 }
@@ -271,10 +263,8 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             RedisModuleCallReply *subreply =
                 RedisModule_CallReplyArrayElement(reply, s);
             const char *job_c = RedisModule_CallReplyStringPtr(subreply, NULL);
-            long long job = strtoll(job_c, NULL, 10);
-            if ((errno == ERANGE &&
-                    (job == LLONG_MAX || job == LLONG_MIN))
-                || (errno != 0 && job == 0)) {
+            long long job;
+            if (sr_strtoll(job_c, &job) < 0) {
                 continue;
             }
             RedisModuleString *job_key_s = RedisModule_CreateStringPrintf(ctx,

@@ -30,12 +30,10 @@
 #include "jobcomp_qry.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <limits.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "common/iso8601_format.h"
+#include "common/stringto.h"
 
 typedef struct job_query {
     RedisModuleCtx *ctx;
@@ -124,18 +122,12 @@ int job_query_prepare(job_query_t qry)
     strncpy(qry->start_time, start_c, ISO8601_SZ-1);
     strncpy(qry->end_time, end_c, ISO8601_SZ-1);
 #else
-    start_time = strtoll(start_c, NULL, 10);
-    if ((errno == ERANGE &&
-            (start_time == LLONG_MAX || start_time == LLONG_MIN))
-        || (errno != 0 && start_time == 0)) {
+    if (sr_strtoll(start_c, &start_time) < 0) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "invalid start time");
         return QUERY_ERR;
     }
-    end_time = strtoll(end_c, NULL, 10);
-    if ((errno == ERANGE &&
-            (end_time == LLONG_MAX || end_time == LLONG_MIN))
-        || (errno != 0 && end_time == 0)) {
+    if (sr_strtoll(end_c, &end_time) < 0) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "invalid end time");
         return QUERY_ERR;
@@ -197,16 +189,11 @@ int job_query_match_job(const job_query_t qry, long long job)
         return QUERY_FAIL;
     }
 #else
-    long long start_time = strtoll(start_c, NULL, 10);
-    if ((errno == ERANGE &&
-            (start_time == LLONG_MAX || start_time == LLONG_MIN))
-        || (errno != 0 && start_time == 0)) {
+    long long start_time, end_time;
+    if (sr_strtoll(start_c, &start_time) < 0) {
         return QUERY_FAIL;
     }
-    long long end_time = strtoll(end_c, NULL, 10);
-    if ((errno == ERANGE &&
-            (end_time == LLONG_MAX || end_time == LLONG_MIN))
-        || (errno != 0 && end_time == 0)) {
+    if (sr_strtoll(end_c, &end_time) < 0) {
         return QUERY_FAIL;
     }
     if (qry->start_time > start_time || qry->end_time < end_time) {
