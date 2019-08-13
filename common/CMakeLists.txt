@@ -27,6 +27,8 @@ add_library(common OBJECT
     iso8601_format.h
     redis_fields.c
     redis_fields.h
+    stringto.c
+    stringto.h
 )
 
 # Object libraries are not PIC by default
