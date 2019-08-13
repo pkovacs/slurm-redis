@@ -38,7 +38,7 @@
 
 #include "common/iso8601_format.h"
 #include "common/redis_fields.h"
-#include "redis/common/sscan_cursor.h"
+#include "common/sscan_cursor.h"
 #include "jobcomp_qry.h"
 
 #define FETCH_MAX_COUNT 500

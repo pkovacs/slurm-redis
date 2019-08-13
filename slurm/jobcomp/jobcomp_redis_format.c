@@ -44,7 +44,7 @@
 #ifdef ISO8601_DATES
 #include "common/iso8601_format.h"
 #endif
-#include "slurm/common/ttl_hash.h"
+#include "common/ttl_hash.h"
 
 static ttl_hash_t user_cache = NULL;
 static ttl_hash_t group_cache = NULL;

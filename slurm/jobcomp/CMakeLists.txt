@@ -43,6 +43,7 @@ target_include_directories(jobcomp_redis
     PRIVATE ${HIREDIS_INCLUDE_DIRS}
     PRIVATE ${UUID_INCLUDE_DIRS}
     PRIVATE ${SLURM_SOURCE_DIR}
+    PRIVATE ${CMAKE_SOURCE_DIR}/slurm
 )
 
 target_link_libraries(jobcomp_redis

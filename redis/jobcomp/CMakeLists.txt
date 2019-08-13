@@ -38,6 +38,7 @@ set_target_properties(slurm_jobcomp
 
 target_include_directories(slurm_jobcomp
     PRIVATE ${REDIS_INCLUDE_DIRS}
+    PRIVATE ${CMAKE_SOURCE_DIR}/redis
 )
 
 target_link_libraries(slurm_jobcomp
