@@ -188,8 +188,8 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                    return REDISMODULE_ERR;
                 }
                 if (job_match == QUERY_PASS) {
-                    // Add ijob to sorted set with score = job so that we can
-                    // pop them off later in job sorted order
+                    // Add job to sorted set with score = job so that we can
+                    // pop them off in SLURMFC.FETCH in job sorted order
                     reply = RedisModule_Call(ctx, "ZADD", "sll", match_set,
                         job, job);
                     RedisModule_FreeCallReply(reply);

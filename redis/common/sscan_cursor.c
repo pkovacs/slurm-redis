@@ -157,6 +157,13 @@ int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len)
         RedisModule_FreeString(cursor->ctx, cursor->err);
         cursor->err = NULL;
     }
+
+    // Initial SSCAN requires a cursor value of zero
+    if (cursor->value == -1) {
+        cursor->value = 0;
+        call_sscan_internal(cursor);
+    }
+
     // We are hiding the repeated calls to SSCAN.  In order to complete
     // a full iteration with SSCAN, it is required that we keep calling
     // SSCAN until the cursor value on reply[0] is zero. We consume the
