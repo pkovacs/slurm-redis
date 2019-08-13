@@ -81,6 +81,7 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     snprintf(buf, sizeof(buf)-1, "%u", SLURM_REDIS_ABI);
     (*fields)->value[kABI] = xstrdup(buf);
 
+// TODO: make date format config-based not compile-based
 #ifdef ISO8601_DATES
     (*fields)->value[kTimeFormat] = xstrdup("1");
 #else
@@ -247,7 +248,6 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
 
     *job = xmalloc(sizeof(jobcomp_job_rec_t));
 
-    // Format of date/time FROM redis is run-time selected via the _tmf field
     if (sr_strtoul(fields->value[kTimeFormat], &_tmf) < 0) {
         return SLURM_ERROR;
     }
@@ -367,9 +367,7 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
 
 char *jobcomp_redis_format_time(time_t t)
 {
-// Format of date/time TO redis is compile-time selected for now
-// via the -DISO8601_DATES=ON/OFF option
-
+// TODO: make date format config-based not compile-based
 #ifdef ISO8601_DATES
     char *buf = xmalloc(ISO8601_SZ);
     if (!mk_iso8601(t, buf)) {

@@ -169,12 +169,18 @@ int slurm_jobcomp_log_record(struct job_record *job)
     redis_fields_t *fields = NULL;
     int rc = jobcomp_redis_format_fields(job, &fields);
     if (rc != SLURM_SUCCESS) {
-        // TODO: e.g. we MUST have fields->value[kJobID]
+        return SLURM_ERROR;
     }
 
+    int i, err = 0, pipeline = 0;
+
+    // Start a multi-statement transaction to cover the creation of the job key
+    // and creation/update of the index
+    redisAppendCommand(ctx, "MULTI");
+    ++pipeline;
+
     // Add the job's field-value pairs to a redis hash set
-    int i = 0, pipeline = 0;
-    for (; i < MAX_REDIS_FIELDS; ++i) {
+    for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
             redisAppendCommand(ctx, "HSET %s:%s %s %s", prefix,
                 fields->value[kJobID], redis_field_labels[i],
@@ -197,8 +203,25 @@ int slurm_jobcomp_log_record(struct job_record *job)
     for (i = 0; i < pipeline; ++i) {
         redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
+        if (reply && (reply->type == REDIS_REPLY_ERROR)) {
+            slurm_debug("redis pipeline error: %s", reply->str);
+            err = 1;
+        }
         freeReplyObject(reply);
     }
+
+    // Commit or rollback the transaction
+    redisReply *reply = NULL;
+    if (err) {
+        slurm_debug("discarding redis transaction for job %s",
+            fields->value[kJobID]);
+        reply = redisCommand(ctx, "DISCARD");
+    } else {
+        slurm_debug("committing redis transaction for job %s",
+            fields->value[kJobID]);
+        reply = redisCommand(ctx, "EXEC");
+    }
+    freeReplyObject(reply);
 
     // Free Mars
     for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
@@ -250,7 +273,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         redis_connect();
     }
 
-    int pipeline = 0;
+    int i, err = 0, pipeline = 0;
     char uuid_s[37];
     char key[128];
     uuid_t uuid;
@@ -259,6 +282,11 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     // Generate a random uuid for the query keys
     uuid_generate(uuid);
     uuid_unparse(uuid, uuid_s);
+
+    // Start a multi-statement transaction to cover the creation of the query
+    // criteria keys needed later for the match request
+    redisAppendCommand(ctx, "MULTI");
+    ++pipeline;
 
     // Create redis hash set for the scalar (singleton) job criteria
     char *start = jobcomp_redis_format_time(job_cond->usage_start);
@@ -298,38 +326,52 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
-    // Use SLURMJC.MATCH to create a match set for the job criteria
-    redisAppendCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
-    ++pipeline;
-
-    // The last reply in the pipeline is for the SLURMJC.MATCH command above
-    // and contains the name of the match set
-    int i = 0, have_matches = 0;
-    for (; i < pipeline; ++i) {
+    // The creation of the criteria keys is the end of the logical transaction
+    for (i = 0; i < pipeline; ++i) {
         redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
-        if (i == pipeline-1) {
-            if (reply && (reply->type == REDIS_REPLY_STRING)) {
-                slurm_debug("redis job matches found (%s)", reply->str);
-                have_matches = reply->len;
-            } else {
-                slurm_debug("redis job matches not found");
-            }
+        if (reply && (reply->type == REDIS_REPLY_ERROR)) {
+            slurm_debug("redis pipeline error: %s", reply->str);
+            err = 1;
         }
         freeReplyObject(reply);
     }
+
+    // Commit or rollback the transaction
+    redisReply *reply = NULL;
+    if (err) {
+        slurm_debug("discarding redis transaction for uuid %s", uuid_s);
+        reply = redisCommand(ctx, "DISCARD");
+        freeReplyObject(reply);
+        return job_list;
+    } else {
+        slurm_debug("committing redis transaction for uuid %s", uuid_s);
+        reply = redisCommand(ctx, "EXEC");
+        freeReplyObject(reply);
+    }
+
+    // Use SLURMJC.MATCH to create a match set for the job criteria
+    int have_matches = 0;
+    reply = redisCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
+    if (reply && (reply->type == REDIS_REPLY_STRING)) {
+        slurm_debug("redis job matches placed in %s", reply->str);
+        have_matches = reply->len;
+    } else {
+        slurm_debug("redis job matches not found");
+    }
+    freeReplyObject(reply);
 
     if (!have_matches) {
         return job_list;
     }
 
     // Use SLURMJC.FETCH to pull down the matching jobs in chunks and build
-    // the return list that slurm needs
+    // the return jobcomp list for slurm
     do {
         redis_fields_t fields;
         redisReply *reply = redisCommand(ctx, "SLURMJC.FETCH %s %s 500",
             prefix, uuid_s);
-        if ((reply->type == REDIS_REPLY_NIL) ||
+        if (!reply || (reply->type == REDIS_REPLY_NIL) ||
             (reply->type != REDIS_REPLY_ARRAY) ||
             (reply->elements == 0)) {
             break;
