@@ -98,6 +98,14 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithCallReply(ctx, reply);
         return REDISMODULE_ERR;
     }
+    RedisModule_FreeCallReply(reply);
+    if (TTL > 0) {
+        reply = RedisModule_Call(ctx, "EXPIRE", "sl", idx, TTL);
+        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
+            RedisModule_ReplyWithCallReply(ctx, reply);
+            return REDISMODULE_ERR;
+        }
+    }
 
     RedisModule_ReplyWithString(ctx, idx);
     return REDISMODULE_OK;
@@ -200,7 +208,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
         return REDISMODULE_ERR;
     }
-    if (RedisModule_SetExpire(match_set_key, QUERY_KEY_TTL * 1000)
+    if (RedisModule_SetExpire(match_set_key, QUERY_TTL * 1000)
         == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "failed to set ttl on match set");
         return REDISMODULE_ERR;

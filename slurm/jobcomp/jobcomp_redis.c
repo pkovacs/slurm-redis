@@ -95,7 +95,7 @@ static int redis_add_job_criteria(const char *key, const List list) {
         redisAppendCommand(ctx, "SADD %s %s", key, value);
         ++pipeline;
     }
-    redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_KEY_TTL);
+    redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_TTL);
     ++pipeline;
     list_iterator_destroy(it);
     return pipeline;
@@ -176,11 +176,16 @@ int slurm_jobcomp_log_record(struct job_record *job)
     int i = 0, pipeline = 0;
     for (; i < MAX_REDIS_FIELDS; ++i) {
         if (fields->value[i]) {
-            redisAppendCommand(ctx, "HSET %s:%s %s %s",
-                prefix, fields->value[kJobID],
-                redis_field_labels[i], fields->value[i]);
+            redisAppendCommand(ctx, "HSET %s:%s %s %s", prefix,
+                fields->value[kJobID], redis_field_labels[i],
+                fields->value[i]);
             ++pipeline;
         }
+    }
+    if (TTL > 0) {
+        redisAppendCommand(ctx, "EXPIRE %s:%s %lld", prefix,
+            fields->value[kJobID], TTL);
+        ++pipeline;
     }
 
     // Use SLURMJC.INDEX to index the job on the redis server
@@ -260,8 +265,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     char *end = jobcomp_redis_format_time(job_cond->usage_end);
     redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", prefix,
         uuid_s, start, end);
-    redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
-        QUERY_KEY_TTL);
+    redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s, QUERY_TTL);
     pipeline += 2;
     xfree(start);
     xfree(end);

@@ -81,8 +81,12 @@ message(STATUS "Found Slurm source dir at ${SLURM_SOURCE_DIR}")
 
 option(ISO8601_DATES "Store ISO8601 dates in redis" ON)
 
-if(NOT QUERY_KEY_TTL)
-    set(QUERY_KEY_TTL "300")
+if(NOT QUERY_TTL)
+    set(QUERY_TTL "300")
+endif()
+
+if(NOT TTL)
+    set(TTL "-1")
 endif()
 
 # --------------
