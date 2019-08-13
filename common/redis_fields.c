@@ -30,6 +30,8 @@
 #include "redis_fields.h"
 
 const char *redis_field_labels[] = {
+    "_abi",
+    "_tmf",
     "JobID",
     "Partition",
     "Start",
@@ -45,7 +47,6 @@ const char *redis_field_labels[] = {
     "JobName",
     "State",
     "TimeLimit",
-    "BlockID",
     "WorkDir",
     "Reservation",
     "ReqGRES",

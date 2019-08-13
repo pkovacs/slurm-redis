@@ -26,37 +26,38 @@
 #ifndef REDIS_FIELDS_H
 #define REDIS_FIELDS_H
 
-#define MAX_REDIS_FIELDS 27
+#define MAX_REDIS_FIELDS 28
 
 // Redis field index
 enum redis_field_index {
-    kJobID = 0,
-    kPartition = 1,
-    kStart = 2,
-    kEnd = 3,
-    kElapsed = 4,
-    kUID = 5,
-    kUser = 6,
-    kGID = 7,
-    kGroup = 8,
-    kNNodes = 9,
-    kNCPUs = 10,
-    kNodeList = 11,
-    kJobName = 12,
-    kState = 13,
-    kTimeLimit = 14,
-    kBlockID = 15,
-    kWorkDir = 16,
-    kReservation = 17,
-    kReqGRES = 18,
-    kAccount = 19,
-    kQOS = 20,
-    kWCKey = 21,
-    kCluster = 22,
-    kSubmit = 23,
-    kEligible = 24,
-    kDerivedExitCode = 25,
-    kExitCode = 26
+    kABI = 0,
+    kTimeFormat = 1,
+    kJobID = 2,
+    kPartition = 3,
+    kStart = 4,
+    kEnd = 5,
+    kElapsed = 6,
+    kUID = 7,
+    kUser = 8,
+    kGID = 9,
+    kGroup = 10,
+    kNNodes = 11,
+    kNCPUs = 12,
+    kNodeList = 13,
+    kJobName = 14,
+    kState = 15,
+    kTimeLimit = 16,
+    kWorkDir = 17,
+    kReservation = 18,
+    kReqGRES = 19,
+    kAccount = 20,
+    kQOS = 21,
+    kWCKey = 22,
+    kCluster = 23,
+    kSubmit = 24,
+    kEligible = 25,
+    kDerivedExitCode = 26,
+    kExitCode = 27
 };
 
 // Redis field labels

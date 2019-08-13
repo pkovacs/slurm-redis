@@ -47,6 +47,7 @@ include(TestCompiler)
 set(SLURM_REDIS_VERSION_MAJOR 0)
 set(SLURM_REDIS_VERSION_MINOR 1)
 set(SLURM_REDIS_VERSION_PATCH 0)
+set(SLURM_REDIS_ABI 0)
 
 # -----------------
 # Set compile flags

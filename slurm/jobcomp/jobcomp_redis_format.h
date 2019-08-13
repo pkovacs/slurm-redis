@@ -40,38 +40,38 @@
  *
 typedef struct {
  x  uint32_t jobid;       // JobID      +
- *  char *partition;      // Partition  +
+ x  char *partition;      // Partition  +
  x  char *start_time;     // Start      +
  x  char *end_time;       // End        +
- *  time_t elapsed_time;  // Elapsed    +
- *  uint32_t uid;         // UID        +
- *  char *uid_name;       // User       +
- *  uint32_t gid;         // GID        +
- *  char *gid_name;       // Group      +
- *  uint32_t node_cnt;    // NNodes     +
- *  uint32_t proc_cnt;    // NCPUs      +
- *  char *nodelist;       // NodeList   +
- *  char *jobname;        // JobName    +
- *  char *state;          // State      +
- *  char *timelimit;      // TimeLimit  +
-    char *blockid;        // BlockID    +
+ x  time_t elapsed_time;  // Elapsed    +
+ x  uint32_t uid;         // UID        +
+ x  char *uid_name;       // User       +
+ x  uint32_t gid;         // GID        +
+ x  char *gid_name;       // Group      +
+ x  uint32_t node_cnt;    // NNodes     +
+ x  uint32_t proc_cnt;    // NCPUs      +
+ x  char *nodelist;       // NodeList   +
+ x  char *jobname;        // JobName    +
+ x  char *state;          // State      +
+ x  char *timelimit;      // TimeLimit  +
+    char *blockid;        // ?? bluegene only -- sourced from job comment ?? +
     char *connection;     // ?? unused by sacct
     char *reboot;         // ?? unused by sacct
     char *rotate;         // ?? unused by sacct
     uint32_t max_procs;   // ?? unused by sacct
     char *geo;            // ?? unused by sacct
     char *bg_start_point; // ?? unused by sacct
- *  char *work_dir;       // WorkDir    +
- *  char *resv_name;      // Reservation+
- *  char *req_gres;       // ReqGRES    +
- *  char *account;        // Account    +
- *  char *qos_name;       // QOS        +
- *  char *wckey;          // WCKey      +
- *  char *cluster;        // Cluster    +
- *  char *submit_time;    // Submit     // sacct uses job_comp->start_time (bug)
- *  char *eligible_time;  // Eligible   +
- *  char *derived_ec;     // DerivedExitCode +
- *  char *exit_code;      // ExitCode   +
+ x  char *work_dir;       // WorkDir    +
+ x  char *resv_name;      // Reservation+
+ x  char *req_gres;       // ReqGRES    +
+ x  char *account;        // Account    +
+ x  char *qos_name;       // QOS        +
+ x  char *wckey;          // WCKey      +
+ x  char *cluster;        // Cluster    +
+ x  char *submit_time;    // Submit     // sacct uses job_comp->start_time (bug)
+ x  char *eligible_time;  // Eligible   +
+ x  char *derived_ec;     // DerivedExitCode +
+ x  char *exit_code;      // ExitCode   +
 } jobcomp_job_rec_t;
  */
 

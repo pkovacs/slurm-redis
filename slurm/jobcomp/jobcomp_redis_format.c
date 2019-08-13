@@ -78,6 +78,17 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     *fields = xmalloc(sizeof(redis_fields_t));
 
     char buf[64];
+
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", SLURM_REDIS_ABI);
+    (*fields)->value[kABI] = xstrdup(buf);
+
+#ifdef ISO8601_DATES
+    (*fields)->value[kTimeFormat] = xstrdup("1");
+#else
+    (*fields)->value[kTimeFormat] = xstrdup("0");
+#endif
+
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->job_id);
     (*fields)->value[kJobID] = xstrdup(buf);
@@ -153,7 +164,7 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     } else {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf)-1, "%u", job->time_limit);
-        (*fields)->value[kUID] = xstrdup(buf);
+        (*fields)->value[kTimeLimit] = xstrdup(buf);
     }
 
     // Below and all the way to the bottom of the function are data for which
@@ -234,47 +245,144 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     assert(fields != NULL);
     assert(job != NULL);
 
-    char buf[32];
     *job = xmalloc(sizeof(jobcomp_job_rec_t));
 
-    unsigned long jobid = strtoul(fields->value[kJobID], NULL, 10);
-    if ((errno == ERANGE && (jobid == ULONG_MAX))
-        || (errno != 0 && jobid == 0)) {
-        return SLURM_ERROR;
+    {
+        unsigned long jobid = strtoul(fields->value[kJobID], NULL, 10);
+        if ((errno == ERANGE && (jobid == ULONG_MAX))
+            || (errno != 0 && jobid == 0)) {
+            return SLURM_ERROR;
+        }
+        (*job)->jobid = (uint32_t)jobid;
     }
-    (*job)->jobid = (uint32_t)jobid;
+
     (*job)->partition = xstrdup(fields->value[kPartition]);
 
 #ifdef ISO8601_DATES
     // We store the date/time in redis as iso8601 w/tz "Z" (Zero/Zulu),
     // so first use our mk_time function to convert it back to time_t,
     // then use slurm_make_time_str to format it for slurm
-    time_t start_time = mk_time(fields->value[kStart]);
-    time_t end_time = mk_time(fields->value[kEnd]);
-    slurm_make_time_str(&start_time, buf, sizeof(buf));
-    (*job)->start_time = xstrdup(buf);
-    slurm_make_time_str(&end_time, buf, sizeof(buf));
-    (*job)->end_time = xstrdup(buf);
+    {
+        char buf[32];
+        time_t start_time = mk_time(fields->value[kStart]);
+        time_t end_time = mk_time(fields->value[kEnd]);
+        time_t submit_time = mk_time(fields->value[kSubmit]);
+        time_t eligible_time = mk_time(fields->value[kEligible]);
+        slurm_make_time_str(&start_time, buf, sizeof(buf));
+        (*job)->start_time = xstrdup(buf);
+        slurm_make_time_str(&end_time, buf, sizeof(buf));
+        (*job)->end_time = xstrdup(buf);
+        slurm_make_time_str(&submit_time, buf, sizeof(buf));
+        (*job)->submit_time = xstrdup(buf);
+        slurm_make_time_str(&eligible_time, buf, sizeof(buf));
+        (*job)->eligible_time = xstrdup(buf);
+    }
 #else
     // We store the date/time in redis as an integer string (epoch time),
     // so just convert it to a time_t, then use slurm_make_time_str
-    long int t = strtol(fields->value[kStart], NULL, 10);
-    if ((errno == ERANGE &&
-            ((t == LONG_MAX) || (t == LONG_MIN)))
-        || (errno != 0 && t == 0)) {
-        return SLURM_ERROR;
+    {
+        char buf[32];
+        time_t start_time, end_time, submit_time, eligible_time;
+        long time_i = strtol(fields->value[kStart], NULL, 10);
+        if ((errno == ERANGE &&
+                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
+            || (errno != 0 && time_i == 0)) {
+            return SLURM_ERROR;
+        }
+        start_time = (time_t)time_i;
+        slurm_make_time_str(&start_time, buf, sizeof(buf));
+        (*job)->start_time = xstrdup(buf);
+        time_i = strtol(fields->value[kEnd], NULL, 10);
+        if ((errno == ERANGE &&
+                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
+            || (errno != 0 && time_i == 0)) {
+            return SLURM_ERROR;
+        }
+        end_time = (time_t)time_i;
+        (*job)->end_time = xstrdup(buf);
+        slurm_make_time_str(&end_time, buf, sizeof(buf));
+        time_i = strtol(fields->value[kSubmit], NULL, 10);
+        if ((errno == ERANGE &&
+                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
+            || (errno != 0 && time_i == 0)) {
+            return SLURM_ERROR;
+        }
+        submit_time = (time_t)time_i;
+        slurm_make_time_str(&submit_time, buf, sizeof(buf));
+        (*job)->submit_time = xstrdup(buf);
+        time_i = strtol(fields->value[kEligible], NULL, 10);
+        if ((errno == ERANGE &&
+                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
+            || (errno != 0 && time_i == 0)) {
+            return SLURM_ERROR;
+        }
+        eligible_time = (time_t)time_i;
+        slurm_make_time_str(&eligible_time, buf, sizeof(buf));
+        (*job)->eligible_time = xstrdup(buf);
     }
-    time_t start_time = (time_t)t;
-    slurm_make_time_str(&start_time, buf, sizeof(buf));
-    t = strtol(fields->value[kEnd], NULL, 10);
-    if ((errno == ERANGE &&
-            ((t == LONG_MAX) || (t == LONG_MIN)))
-        || (errno != 0 && t == 0)) {
-        return SLURM_ERROR;
-    }
-    time_t end_time = (time_t)t;
-    slurm_make_time_str(&end_time, buf, sizeof(buf));
 #endif
+    {
+        long time_i = strtol(fields->value[kElapsed], NULL, 10);
+        if ((errno == ERANGE &&
+                ((time_i == LONG_MAX) || (time_i == LONG_MIN)))
+            || (errno != 0 && time_i == 0)) {
+            return SLURM_ERROR;
+        }
+        (*job)->elapsed_time = (time_t)time_i;
+    }
+
+    {
+        unsigned long uid = strtoul(fields->value[kUID], NULL, 10);
+        if ((errno == ERANGE && (uid == ULONG_MAX))
+            || (errno != 0 && uid == 0)) {
+            return SLURM_ERROR;
+        }
+        (*job)->uid = (uint32_t)uid;
+        (*job)->uid_name = xstrdup(fields->value[kUser]);
+    }
+
+    {
+        unsigned long gid = strtoul(fields->value[kGID], NULL, 10);
+        if ((errno == ERANGE && (gid == ULONG_MAX))
+            || (errno != 0 && gid == 0)) {
+            return SLURM_ERROR;
+        }
+        (*job)->gid = (uint32_t)gid;
+        (*job)->gid_name = xstrdup(fields->value[kGroup]);
+    }
+
+    {
+        unsigned long nnodes = strtoul(fields->value[kNNodes], NULL, 10);
+        if ((errno == ERANGE && (nnodes == ULONG_MAX))
+            || (errno != 0 && nnodes == 0)) {
+            return SLURM_ERROR;
+        }
+        (*job)->node_cnt = (uint32_t)nnodes;
+    }
+
+    {
+        unsigned long ncpus = strtoul(fields->value[kNCPUs], NULL, 10);
+        if ((errno == ERANGE && (ncpus == ULONG_MAX))
+            || (errno != 0 && ncpus == 0)) {
+            return SLURM_ERROR;
+        }
+        (*job)->proc_cnt = (uint32_t)ncpus;
+    }
+
+    (*job)->nodelist = xstrdup(fields->value[kNodeList]);
+    (*job)->jobname = xstrdup(fields->value[kJobName]);
+    (*job)->state = xstrdup(fields->value[kState]);
+    (*job)->timelimit = xstrdup(fields->value[kTimeLimit]);
+    (*job)->work_dir = xstrdup(fields->value[kWorkDir]);
+    (*job)->resv_name = xstrdup(fields->value[kReservation]);
+    (*job)->req_gres = xstrdup(fields->value[kReqGRES]);
+    (*job)->account = xstrdup(fields->value[kAccount]);
+    (*job)->qos_name = xstrdup(fields->value[kQOS]);
+    (*job)->wckey = xstrdup(fields->value[kWCKey]);
+    (*job)->cluster = xstrdup(fields->value[kCluster]);
+    (*job)->derived_ec = xstrdup(fields->value[kDerivedExitCode]);
+    (*job)->exit_code = xstrdup(fields->value[kExitCode]);
+
     return SLURM_SUCCESS;
 }
 
