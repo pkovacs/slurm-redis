@@ -38,6 +38,7 @@
 #include <src/common/xstring.h> /* xstrdup, ... */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
+#include "jobcomp_redis_cleanup.h"
 #include "jobcomp_redis_format.h"
 
 #define USER_CACHE_SZ 64
@@ -74,30 +75,25 @@ static int redis_connect(void)
 
 static int redis_connected(void)
 {
-    int rc = 0;
     if (!ctx) {
-        return rc;
+        return 0;
     }
-    redisReply *reply;
+    AUTO_REPLY redisReply *reply;
     reply = redisCommand(ctx, "PING");
-    if (ctx->err == 0) {
-        freeReplyObject(reply);
-        rc = 1;
-    }
-    return rc;
+    return (reply && (reply->type == REDIS_REPLY_STATUS)
+        && strcmp(reply->str, "PONG") == 0);
 }
 
 static int redis_add_job_criteria(const char *key, const List list) {
     char *value;
     int pipeline = 0;
-    ListIterator it = list_iterator_create(list);
+    AUTO_LITER ListIterator it = list_iterator_create(list);
     while ((value = list_next(it))) {
         redisAppendCommand(ctx, "SADD %s %s", key, value);
         ++pipeline;
     }
     redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_TTL);
     ++pipeline;
-    list_iterator_destroy(it);
     return pipeline;
 }
 
@@ -146,13 +142,12 @@ int slurm_jobcomp_set_location(char *location)
         return SLURM_SUCCESS;
     }
 
-    char *loc = location ? xstrdup(location) : slurm_get_jobcomp_loc();
+    AUTO_STR char *loc = location ? xstrdup(location) : slurm_get_jobcomp_loc();
     if (!loc || strcmp(loc, DEFAULT_JOB_COMP_LOC) == 0) {
         prefix = xstrdup("job");
     } else if (loc) {
         prefix = xstrdup_printf("%s:job", loc);
     }
-    xfree(loc);
     return SLURM_SUCCESS;
 }
 
@@ -166,7 +161,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         redis_connect();
     }
 
-    redis_fields_t *fields = NULL;
+    AUTO_FIELDS redis_fields_t *fields = NULL;
     int rc = jobcomp_redis_format_fields(job, &fields);
     if (rc != SLURM_SUCCESS) {
         return SLURM_ERROR;
@@ -201,17 +196,16 @@ int slurm_jobcomp_log_record(struct job_record *job)
 
     // Pop the pipeline replies
     for (i = 0; i < pipeline; ++i) {
-        redisReply *reply = NULL;
+        AUTO_REPLY redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
         if (reply && (reply->type == REDIS_REPLY_ERROR)) {
             slurm_debug("redis pipeline error: %s", reply->str);
             err = 1;
         }
-        freeReplyObject(reply);
     }
 
     // Commit or rollback the transaction
-    redisReply *reply = NULL;
+    AUTO_REPLY redisReply *reply = NULL;
     if (err) {
         slurm_debug("discarding redis transaction for job %s",
             fields->value[kJobID]);
@@ -221,13 +215,6 @@ int slurm_jobcomp_log_record(struct job_record *job)
             fields->value[kJobID]);
         reply = redisCommand(ctx, "EXEC");
     }
-    freeReplyObject(reply);
-
-    // Free Mars
-    for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
-        xfree(fields->value[i]);
-    }
-    xfree(fields);
 
     return SLURM_SUCCESS;
 }
@@ -289,14 +276,15 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     ++pipeline;
 
     // Create redis hash set for the scalar (singleton) job criteria
-    char *start = jobcomp_redis_format_time(job_cond->usage_start);
-    char *end = jobcomp_redis_format_time(job_cond->usage_end);
-    redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", prefix,
-        uuid_s, start, end);
-    redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s, QUERY_TTL);
-    pipeline += 2;
-    xfree(start);
-    xfree(end);
+    {
+        AUTO_STR char *start = jobcomp_redis_format_time(job_cond->usage_start);
+        AUTO_STR char *end = jobcomp_redis_format_time(job_cond->usage_end);
+        redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", prefix,
+            uuid_s, start, end);
+        redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
+            QUERY_TTL);
+        pipeline += 2;
+    }
 
     // Create redis set for userid_list
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
@@ -328,49 +316,48 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 
     // The creation of the criteria keys is the end of the logical transaction
     for (i = 0; i < pipeline; ++i) {
-        redisReply *reply = NULL;
+        AUTO_REPLY redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
         if (reply && (reply->type == REDIS_REPLY_ERROR)) {
             slurm_debug("redis pipeline error: %s", reply->str);
             err = 1;
         }
-        freeReplyObject(reply);
     }
 
     // Commit or rollback the transaction
-    redisReply *reply = NULL;
-    if (err) {
-        slurm_debug("discarding redis transaction for uuid %s", uuid_s);
-        reply = redisCommand(ctx, "DISCARD");
-        freeReplyObject(reply);
-        return job_list;
-    } else {
+    {
+        AUTO_REPLY redisReply *reply = NULL;
+        if (err) {
+            slurm_debug("discarding redis transaction for uuid %s", uuid_s);
+            reply = redisCommand(ctx, "DISCARD");
+            return job_list;
+        }
         slurm_debug("committing redis transaction for uuid %s", uuid_s);
         reply = redisCommand(ctx, "EXEC");
-        freeReplyObject(reply);
     }
 
     // Use SLURMJC.MATCH to create a match set for the job criteria
-    int have_matches = 0;
-    reply = redisCommand(ctx, "SLURMJC.MATCH %s %s", prefix, uuid_s);
-    if (reply && (reply->type == REDIS_REPLY_STRING)) {
-        slurm_debug("redis job matches placed in %s", reply->str);
-        have_matches = reply->len;
-    } else {
-        slurm_debug("redis job matches not found");
-    }
-    freeReplyObject(reply);
-
-    if (!have_matches) {
-        return job_list;
+    {
+        int have_matches = 0;
+        AUTO_REPLY redisReply *reply = redisCommand(ctx, "SLURMJC.MATCH %s %s",
+            prefix, uuid_s);
+        if (reply && (reply->type == REDIS_REPLY_STRING)) {
+            slurm_debug("redis job matches placed in %s", reply->str);
+            have_matches = reply->len;
+        } else {
+            slurm_debug("redis job matches not found");
+        }
+        if (!have_matches) {
+            return job_list;
+        }
     }
 
     // Use SLURMJC.FETCH to pull down the matching jobs in chunks and build
     // the return jobcomp list for slurm
     do {
-        redis_fields_t fields;
-        redisReply *reply = redisCommand(ctx, "SLURMJC.FETCH %s %s 500",
-            prefix, uuid_s);
+        redis_fields_t fields; // stack is ok
+        AUTO_REPLY redisReply *reply = redisCommand(ctx,
+            "SLURMJC.FETCH %s %s 500", prefix, uuid_s);
         if (!reply || (reply->type == REDIS_REPLY_NIL) ||
             (reply->type != REDIS_REPLY_ARRAY) ||
             (reply->elements == 0)) {
@@ -380,7 +367,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         for (; i < reply->elements; ++i) {
             size_t j = 0;
             jobcomp_job_rec_t *job = NULL;
-            redisReply *subreply = reply->element[i];
+            const redisReply *subreply = reply->element[i]; // not auto
             for (; j < subreply->elements; ++j) {
                 if (subreply->element[j]->type == REDIS_REPLY_STRING) {
                     fields.value[j] = subreply->element[j]->str;
@@ -388,13 +375,11 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
                     fields.value[j] = NULL;
                 }
             }
-            slurm_debug("Job ID %s match", fields.value[kJobID]);
             if (jobcomp_redis_format_job(&fields, &job) != SLURM_SUCCESS) {
                 continue;
             }
             list_append(job_list, job);
         }
-        freeReplyObject(reply);
     } while (1);
 
     return job_list;
