@@ -67,7 +67,7 @@ static int redis_connect(void)
     }
     ctx = redisConnect(host, port);
     if (!ctx || ctx->err) {
-        slurm_error("Connection error: %s\n", ctx->errstr);
+        slurm_error("redis connect error: %s", ctx->errstr);
         return SLURM_ERROR;
     }
     return SLURM_SUCCESS;
