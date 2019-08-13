@@ -302,6 +302,7 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                 redis_field_labels[24], &fields[24],
                 redis_field_labels[25], &fields[25],
                 redis_field_labels[26], &fields[26],
+                redis_field_labels[27], &fields[27],
                 NULL) == REDISMODULE_ERR) {
                     continue;
             }
