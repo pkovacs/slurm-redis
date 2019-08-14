@@ -56,14 +56,11 @@ const unsigned int _tmf = 1;
 const unsigned int _tmf = 0;
 #endif
 
-/*
- * Could use: mysql_db_info_t *create_mysql_db_info() to get host/port/pass
- */
-
-static const char *host = "127.0.0.1";
-static const int port = 6379;
+static const char *host = NULL;
+static uint32_t port = 0;
+static const char *pass = NULL;
+static const char *prefix = NULL;
 static redisContext *ctx = NULL;
-static char *prefix = NULL;
 
 static int redis_connect(void)
 {
@@ -76,6 +73,13 @@ static int redis_connect(void)
         slurm_error("redis connect error: %s", ctx->errstr);
         return SLURM_ERROR;
     }
+    if (pass) {
+        AUTO_REPLY redisReply *reply = redisCommand(ctx, "AUTH %s", pass);
+        if (reply && (reply->type == REDIS_REPLY_ERROR)) {
+            slurm_debug("redis error: %s", reply->str);
+            return SLURM_ERROR;
+        }
+    }
     return SLURM_SUCCESS;
 }
 
@@ -84,10 +88,17 @@ static int redis_connected(void)
     if (!ctx) {
         return 0;
     }
-    AUTO_REPLY redisReply *reply;
-    reply = redisCommand(ctx, "PING");
-    return (reply && (reply->type == REDIS_REPLY_STATUS)
-        && strcmp(reply->str, "PONG") == 0);
+    AUTO_REPLY redisReply *reply = redisCommand(ctx, "PING");
+    if (reply) {
+        if (reply->type == REDIS_REPLY_ERROR) {
+            slurm_debug("redis error: %s", reply->str);
+            return 0;
+        }
+        if (reply->type == REDIS_REPLY_STATUS) {
+            return strcmp(reply->str, "PONG") == 0;
+        }
+    }
+    return 0;
 }
 
 static int redis_add_job_criteria(const char *key, const List list) {
@@ -112,6 +123,17 @@ int init(void)
     } else {
         slurm_debug("%s loaded", plugin_name);
     }
+    if (!host) {
+        host = slurm_get_jobcomp_host();
+        slurm_debug("redis host %s", host);
+    }
+    if (!port) {
+        port = slurm_get_jobcomp_port();
+        slurm_debug("redis port %u", port);
+    }
+    if (!pass) {
+        pass = slurm_get_jobcomp_pass();
+    }
     jobcomp_redis_format_init_t format_init = {
         .user_cache_sz = USER_CACHE_SZ,
         .user_cache_ttl = USER_CACHE_TTL,
@@ -129,6 +151,8 @@ int fini(void)
         redisFree(ctx);
         ctx = NULL;
     }
+    xfree(host);
+    xfree(pass);
     xfree(prefix);
     jobcomp_redis_format_fini();
     return SLURM_SUCCESS;
@@ -139,11 +163,9 @@ int slurm_jobcomp_set_location(char *location)
     if (redis_connected()) {
         return SLURM_SUCCESS;
     }
-
     if (redis_connect() != SLURM_SUCCESS) {
         return SLURM_ERROR;
     }
-
     if (prefix) {
         return SLURM_SUCCESS;
     }
@@ -162,9 +184,11 @@ int slurm_jobcomp_log_record(struct job_record *job)
     if (!job) {
         return SLURM_SUCCESS;
     }
-
     if (!redis_connected()) {
         redis_connect();
+    }
+    if (!redis_connected()) {
+        return SLURM_ERROR;
     }
 
     AUTO_FIELDS redis_fields_t *fields = NULL;
@@ -205,7 +229,9 @@ int slurm_jobcomp_log_record(struct job_record *job)
         AUTO_REPLY redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
         if (reply && (reply->type == REDIS_REPLY_ERROR)) {
-            slurm_debug("redis pipeline error: %s", reply->str);
+            if (!err) {
+                slurm_debug("redis error: %s", reply->str);
+            }
             err = 1;
         }
     }
@@ -261,9 +287,11 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     if (!job_cond) {
         return NULL;
     }
-
     if (!redis_connected()) {
         redis_connect();
+    }
+    if (!redis_connected()) {
+        return NULL;
     }
 
     int i, err = 0, pipeline = 0;
@@ -323,12 +351,14 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
-    // The creation of the criteria keys is the end of the logical transaction
+    // Pop the pipeline replies
     for (i = 0; i < pipeline; ++i) {
         AUTO_REPLY redisReply *reply = NULL;
         redisGetReply(ctx, (void **)&reply);
         if (reply && (reply->type == REDIS_REPLY_ERROR)) {
-            slurm_debug("redis pipeline error: %s", reply->str);
+            if (!err) {
+                slurm_debug("redis error: %s", reply->str);
+            }
             err = 1;
         }
     }

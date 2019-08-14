@@ -205,7 +205,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                 if (job_match == QUERY_ERR) {
                     job_query_error(qry, &err, NULL);
                     RedisModule_ReplyWithError(ctx, err);
-                   return REDISMODULE_ERR;
+                    return REDISMODULE_ERR;
                 }
                 if (job_match == QUERY_PASS) {
                     // Add job to sorted set with score = job so that we can
