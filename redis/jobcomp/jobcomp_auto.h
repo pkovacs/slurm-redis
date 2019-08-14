@@ -30,11 +30,15 @@
 
 #include "common/redis_fields.h"
 
+// Use redis_module_string_t on the stack to hold and auto delete
+// the contained redis module string using its context
 typedef struct redis_module_string {
     RedisModuleCtx *ctx;
     RedisModuleString *str;
 } redis_module_string_t;
 
+// Use redis_module_fields_t on the stack to hold and auto delete
+// the contained redis module strings using their context
 typedef struct redis_module_fields {
     RedisModuleCtx *ctx;
     RedisModuleString *str[MAX_REDIS_FIELDS];
