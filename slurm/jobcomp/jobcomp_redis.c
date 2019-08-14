@@ -287,8 +287,9 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
             job_cond->usage_start);
         AUTO_STR char *end = jobcomp_redis_format_time(_tmf,
             job_cond->usage_end);
-        redisAppendCommand(ctx, "HSET %s:qry:%s _tmf %u Start %s End %s",
-            prefix, uuid_s, _tmf, start, end);
+        redisAppendCommand(ctx, "HSET %s:qry:%s _abi %u _tmf %u "
+            "Start %s End %s",
+            prefix, uuid_s, SLURM_REDIS_ABI, _tmf, start, end);
         redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
             QUERY_TTL);
         pipeline += 2;
