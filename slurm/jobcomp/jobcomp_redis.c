@@ -50,6 +50,12 @@ const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
 const uint32_t plugin_version = SLURM_VERSION_NUMBER;
 
+#ifdef ISO8601_DATES
+const unsigned int _tmf = 1;
+#else
+const unsigned int _tmf = 0;
+#endif
+
 /*
  * Could use: mysql_db_info_t *create_mysql_db_info() to get host/port/pass
  */
@@ -162,7 +168,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
     }
 
     AUTO_FIELDS redis_fields_t *fields = NULL;
-    int rc = jobcomp_redis_format_fields(job, &fields);
+    int rc = jobcomp_redis_format_fields(_tmf, job, &fields);
     if (rc != SLURM_SUCCESS) {
         return SLURM_ERROR;
     }
@@ -275,12 +281,14 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     redisAppendCommand(ctx, "MULTI");
     ++pipeline;
 
-    // Create redis hash set for the scalar (singleton) job criteria
+    // Create redis hash set for the job criteria
     {
-        AUTO_STR char *start = jobcomp_redis_format_time(job_cond->usage_start);
-        AUTO_STR char *end = jobcomp_redis_format_time(job_cond->usage_end);
-        redisAppendCommand(ctx, "HSET %s:qry:%s Start %s End %s", prefix,
-            uuid_s, start, end);
+        AUTO_STR char *start = jobcomp_redis_format_time(_tmf,
+            job_cond->usage_start);
+        AUTO_STR char *end = jobcomp_redis_format_time(_tmf,
+            job_cond->usage_end);
+        redisAppendCommand(ctx, "HSET %s:qry:%s _tmf %u Start %s End %s",
+            prefix, uuid_s, _tmf, start, end);
         redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
             QUERY_TTL);
         pipeline += 2;

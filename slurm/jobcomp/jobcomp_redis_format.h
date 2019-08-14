@@ -99,7 +99,7 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init);
 void jobcomp_redis_format_fini();
 
 // Format redis fields from a struct job_record (slurm to redis)
-int jobcomp_redis_format_fields(const struct job_record *job,
+int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     redis_fields_t **fields);
 
 // Format a jobcomp_job_rec_t from redis fields (redis to slurm)
@@ -107,6 +107,6 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     jobcomp_job_rec_t **job);
 
 // Format time_t into string for redis
-char *jobcomp_redis_format_time(time_t t);
+char *jobcomp_redis_format_time(unsigned int tmf, time_t t);
 
 #endif /* JOBCOMP_REDIS_FORMAT_H */

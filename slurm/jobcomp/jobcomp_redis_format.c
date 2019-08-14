@@ -66,7 +66,7 @@ void jobcomp_redis_format_fini()
     destroy_ttl_hash(&group_cache);
 }
 
-int jobcomp_redis_format_fields(const struct job_record *job,
+int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     redis_fields_t **fields)
 {
     assert(job != NULL);
@@ -79,12 +79,11 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     snprintf(buf, sizeof(buf)-1, "%u", SLURM_REDIS_ABI);
     (*fields)->value[kABI] = xstrdup(buf);
 
-// TODO: make date format config-based not compile-based
-#ifdef ISO8601_DATES
-    (*fields)->value[kTimeFormat] = xstrdup("1");
-#else
-    (*fields)->value[kTimeFormat] = xstrdup("0");
-#endif
+    if (tmf == 1) {
+        (*fields)->value[kTimeFormat] = xstrdup("1");
+    } else {
+        (*fields)->value[kTimeFormat] = xstrdup("0");
+    }
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->job_id);
@@ -137,8 +136,8 @@ int jobcomp_redis_format_fields(const struct job_record *job,
     }
     (*fields)->value[kState] = xstrdup(job_state_string(job_state));
 
-    (*fields)->value[kStart] = jobcomp_redis_format_time(start_time);
-    (*fields)->value[kEnd] = jobcomp_redis_format_time(end_time);
+    (*fields)->value[kStart] = jobcomp_redis_format_time(tmf, start_time);
+    (*fields)->value[kEnd] = jobcomp_redis_format_time(tmf, end_time);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%ld",
@@ -170,11 +169,11 @@ int jobcomp_redis_format_fields(const struct job_record *job,
 
     if (job->details) {
         if (job->details->submit_time) {
-            (*fields)->value[kSubmit] = jobcomp_redis_format_time(
+            (*fields)->value[kSubmit] = jobcomp_redis_format_time(tmf,
                 job->details->submit_time);
         }
         if (job->details->begin_time) {
-            (*fields)->value[kEligible] = jobcomp_redis_format_time(
+            (*fields)->value[kEligible] = jobcomp_redis_format_time(tmf,
                 job->details->begin_time);
         }
         if (job->details->work_dir && *job->details->work_dir) {
@@ -363,20 +362,19 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     return SLURM_SUCCESS;
 }
 
-char *jobcomp_redis_format_time(time_t t)
+char *jobcomp_redis_format_time(unsigned int tmf, time_t t)
 {
-// TODO: make date format config-based not compile-based
-#ifdef ISO8601_DATES
-    char *buf = xmalloc(ISO8601_SZ);
-    if (!mk_iso8601(t, buf)) {
-        xfree(buf);
-        return NULL;
+    if (tmf == 1) {
+        char *buf = xmalloc(ISO8601_SZ);
+        if (!mk_iso8601(t, buf)) {
+            xfree(buf);
+            return NULL;
+        }
+        return buf;
+    } else {
+        char buf[64];
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf)-1, "%ld", t);
+        return xstrdup(buf);
     }
-    return buf;
-#else
-    char buf[64];
-    memset(buf, 0, sizeof(buf));
-    snprintf(buf, sizeof(buf)-1, "%ld", t);
-    return xstrdup(buf);
-#endif
 }
