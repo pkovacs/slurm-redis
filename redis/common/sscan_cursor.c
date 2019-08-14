@@ -37,7 +37,7 @@ typedef struct sscan_cursor {
     RedisModuleCtx *ctx;
     RedisModuleCallReply *reply;
     RedisModuleCallReply *subreply_array;
-    RedisModuleString *set;
+    const RedisModuleString *set;
     RedisModuleString *err;
     long long count;
     long long value;
@@ -124,10 +124,6 @@ void destroy_sscan_cursor(sscan_cursor_t *cursor)
         RedisModule_FreeCallReply((*cursor)->reply);
         (*cursor)->reply = NULL;
         (*cursor)->subreply_array = NULL;
-    }
-    if ((*cursor)->set) {
-        RedisModule_FreeString((*cursor)->ctx, (*cursor)->set);
-        (*cursor)->set = NULL;
     }
     if ((*cursor)->err) {
         RedisModule_FreeString((*cursor)->ctx, (*cursor)->err);

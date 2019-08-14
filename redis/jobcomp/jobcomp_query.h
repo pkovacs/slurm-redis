@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef JOBCOMP_QRY_H
-#define JOBCOMP_QRY_H
+#ifndef JOBCOMP_QUERY_H
+#define JOBCOMP_QUERY_H
 
 #include <stddef.h>
 #include <redismodule.h>
@@ -72,4 +72,4 @@ int job_query_start_day(const job_query_t qry, long long *start);
 // Return integer end day for query
 int job_query_end_day(const job_query_t qry, long long *end);
 
-#endif /* JOBCOMP_QRY_H */
+#endif /* JOBCOMP_QUERY_H */

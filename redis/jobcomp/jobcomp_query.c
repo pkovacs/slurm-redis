@@ -27,7 +27,7 @@
 #include "config.h"
 #endif
 
-#include "jobcomp_qry.h"
+#include "jobcomp_query.h"
 
 #include <assert.h>
 #include <string.h>

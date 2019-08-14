@@ -23,17 +23,46 @@
  *
  */
 
-#ifndef JOBCOMP_CMD_H
-#define JOBCOMP_CMD_H
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <redismodule.h>
+#include <src/common/xmalloc.h> /* xfree, ... */
 
-#define JOBCOMP_CMD_INDEX "SLURMJC.INDEX"
-#define JOBCOMP_CMD_MATCH "SLURMJC.MATCH"
-#define JOBCOMP_CMD_FETCH "SLURMJC.FETCH"
+#include "jobcomp_redis_auto.h"
 
-int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
-int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
-int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc);
+void destroy_string(char **str)
+{
+    if (str) {
+        xfree(*str);
+    }
+}
 
-#endif /* JOBCOMP_CMD_H */
+void destroy_list_iterator(ListIterator *it)
+{
+    if (it) {
+        list_iterator_destroy(*it);
+        *it = NULL;
+    }
+}
+
+void destroy_redis_fields(redis_fields_t **fields)
+{
+    if (fields) {
+        size_t i = 0;
+        for (; i < MAX_REDIS_FIELDS; ++i) {
+            if ((*fields)->value[i]) {
+                xfree((*fields)->value[i]);
+            }
+        }
+        xfree(*fields);
+    }
+}
+
+void destroy_redis_reply(redisReply **reply)
+{
+    if (reply) {
+        freeReplyObject(*reply);
+        *reply = NULL;
+    }
+}

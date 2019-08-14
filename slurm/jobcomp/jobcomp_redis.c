@@ -38,7 +38,7 @@
 #include <src/common/xstring.h> /* xstrdup, ... */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
-#include "jobcomp_redis_cleanup.h"
+#include "jobcomp_redis_auto.h"
 #include "jobcomp_redis_format.h"
 
 #define USER_CACHE_SZ 64

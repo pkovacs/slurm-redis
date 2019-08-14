@@ -23,46 +23,31 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#ifndef JOBCOMP_AUTO_H
+#define JOBCOMP_AUTO_H
 
-#include <src/common/xmalloc.h> /* xfree, ... */
+#include <redismodule.h>
 
-#include "jobcomp_redis_cleanup.h"
+#include "common/redis_fields.h"
 
-void destroy_string(char **str)
-{
-    if (str) {
-        xfree(*str);
-    }
-}
+typedef struct redis_module_string {
+    RedisModuleCtx *ctx;
+    RedisModuleString *str;
+} redis_module_string_t;
 
-void destroy_list_iterator(ListIterator *it)
-{
-    if (it) {
-        list_iterator_destroy(*it);
-        *it = NULL;
-    }
-}
+typedef struct redis_module_fields {
+    RedisModuleCtx *ctx;
+    RedisModuleString *str[MAX_REDIS_FIELDS];
+} redis_module_fields_t;
 
-void destroy_redis_fields(redis_fields_t **fields)
-{
-    if (fields) {
-        size_t i = 0;
-        for (; i < MAX_REDIS_FIELDS; ++i) {
-            if ((*fields)->value[i]) {
-                xfree((*fields)->value[i]);
-            }
-        }
-        xfree(*fields);
-    }
-}
+#define AUTO_RMKEY AUTO_PTR(close_redis_key)
+#define AUTO_RMREPLY AUTO_PTR(destroy_redis_reply)
+#define AUTO_RMSTR AUTO_PTR(destroy_redis_module_string)
+#define AUTO_RMFIELDS AUTO_PTR(destroy_redis_module_fields)
 
-void destroy_redis_reply(redisReply **reply)
-{
-    if (reply) {
-        freeReplyObject(*reply);
-        *reply = NULL;
-    }
-}
+void close_redis_key(RedisModuleKey **key);
+void destroy_redis_reply(RedisModuleCallReply **reply);
+void destroy_redis_module_string(redis_module_string_t *str);
+void destroy_redis_module_fields(redis_module_fields_t *fields);
+
+#endif /* JOBCOMP_AUTO_H */

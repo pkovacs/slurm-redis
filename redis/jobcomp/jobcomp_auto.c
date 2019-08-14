@@ -23,23 +23,44 @@
  *
  */
 
-#ifndef JOBCOMP_REDIS_CLEANUP_H
-#define JOBCOMP_REDIS_CLEANUP_H
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <hiredis.h>
+#include "jobcomp_auto.h"
 
-#include <src/common/list.h> /* ListIterator, ... */
+void close_redis_key(RedisModuleKey **key)
+{
+    if (key) {
+        RedisModule_CloseKey(*key);
+    }
+}
 
-#include "jobcomp_redis_format.h"
+void destroy_redis_reply(RedisModuleCallReply **reply)
+{
+    if (reply) {
+        RedisModule_FreeCallReply(*reply);
+        *reply = NULL;
+    }
+}
 
-#define AUTO_STR AUTO_PTR(destroy_string)
-#define AUTO_LITER AUTO_PTR(destroy_list_iterator)
-#define AUTO_FIELDS AUTO_PTR(destroy_redis_fields)
-#define AUTO_REPLY AUTO_PTR(destroy_redis_reply)
+void destroy_redis_module_string(redis_module_string_t *str)
+{
+    if (str) {
+        RedisModule_FreeString(str->ctx, str->str);
+        str->str = NULL;
+    }
+}
 
-void destroy_string(char **str);
-void destroy_list_iterator(ListIterator *it);
-void destroy_redis_fields(redis_fields_t **fields);
-void destroy_redis_reply(redisReply **reply);
-
-#endif /* JOBCOMP_REDIS_CLEANUP_H */
+void destroy_redis_module_fields(redis_module_fields_t *fields)
+{
+    if (fields) {
+        int i = 0;
+        for (; i < MAX_REDIS_FIELDS; ++i) {
+            if (fields->str[i]) {
+                RedisModule_FreeString(fields->ctx, fields->str[i]);
+                fields->str[i] = NULL;
+            }
+        }
+    }
+}

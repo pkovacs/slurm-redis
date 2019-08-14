@@ -24,8 +24,8 @@
 
 add_library(jobcomp_redis MODULE
     jobcomp_redis.c
-    jobcomp_redis_cleanup.c
-    jobcomp_redis_cleanup.h
+    jobcomp_redis_auto.c
+    jobcomp_redis_auto.h
     jobcomp_redis_format.c
     jobcomp_redis_format.h
 )

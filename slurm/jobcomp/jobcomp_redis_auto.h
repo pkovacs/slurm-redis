@@ -23,45 +23,23 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#ifndef JOBCOMP_REDIS_AUTO_H
+#define JOBCOMP_REDIS_AUTO_H
 
-#include <redismodule.h>
+#include <hiredis.h>
 
-#include "jobcomp_command.h"
+#include <src/common/list.h> /* ListIterator, ... */
 
-const char *module_name = "slurm_jobcomp";
-const int module_version = 1;
+#include "jobcomp_redis_format.h"
 
-int RedisModule_OnLoad(RedisModuleCtx *ctx)
-{
-    // Register the module
-    if (RedisModule_Init(ctx, module_name, module_version, REDISMODULE_APIVER_1)
-        == REDISMODULE_ERR) {
-        return REDISMODULE_ERR;
-    }
+#define AUTO_STR AUTO_PTR(destroy_string)
+#define AUTO_LITER AUTO_PTR(destroy_list_iterator)
+#define AUTO_FIELDS AUTO_PTR(destroy_redis_fields)
+#define AUTO_REPLY AUTO_PTR(destroy_redis_reply)
 
-    // Register the SLURMJC.INDEX command
-    if (RedisModule_CreateCommand(ctx, JOBCOMP_COMMAND_INDEX, jobcomp_cmd_index,
-            "write", 1, 1, 1)
-        == REDISMODULE_ERR) {
-        return REDISMODULE_ERR;
-    }
+void destroy_string(char **str);
+void destroy_list_iterator(ListIterator *it);
+void destroy_redis_fields(redis_fields_t **fields);
+void destroy_redis_reply(redisReply **reply);
 
-    // Register the SLURMJC.MATCH command
-    if (RedisModule_CreateCommand(ctx, JOBCOMP_COMMAND_MATCH, jobcomp_cmd_match,
-            "write", 1, 1, 1)
-        == REDISMODULE_ERR) {
-        return REDISMODULE_ERR;
-    }
-
-    // Register the SLURMJC.FETCH command
-    if (RedisModule_CreateCommand(ctx, JOBCOMP_COMMAND_FETCH, jobcomp_cmd_fetch,
-            "write", 1, 1, 1)
-        == REDISMODULE_ERR) {
-        return REDISMODULE_ERR;
-    }
-
-    return REDISMODULE_OK;
-}
+#endif /* JOBCOMP_REDIS_AUTO_H */

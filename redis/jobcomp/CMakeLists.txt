@@ -23,11 +23,13 @@
 #
 
 add_library(slurm_jobcomp MODULE
+    jobcomp_auto.c
+    jobcomp_auto.h
+    jobcomp_command.c
+    jobcomp_command.h
+    jobcomp_query.c
+    jobcomp_query.h
     slurm_jobcomp.c
-    jobcomp_cmd.c
-    jobcomp_cmd.h
-    jobcomp_qry.c
-    jobcomp_qry.h
 )
 
 set_target_properties(slurm_jobcomp
