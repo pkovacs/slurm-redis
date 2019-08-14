@@ -52,10 +52,10 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     const char *prefix = RedisModule_StringPtrLen(argv[1], NULL);
     const char *jobid = RedisModule_StringPtrLen(argv[2], NULL);
-    AUTO_RMSTR redis_module_string_t job_keyname;
-        job_keyname.ctx = ctx;
-        job_keyname.str = RedisModule_CreateStringPrintf(ctx, "%s:%s",
-            prefix, jobid);
+    AUTO_RMSTR redis_module_string_t job_keyname = {
+        .ctx = ctx,
+        .str = RedisModule_CreateStringPrintf(ctx, "%s:%s", prefix, jobid)
+    };
 
     // Open the job key
     AUTO_RMKEY RedisModuleKey *key = RedisModule_OpenKey(ctx,
@@ -70,12 +70,8 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     }
 
     // Fetch the needed job data
-    AUTO_RMSTR redis_module_string_t tmf;
-        tmf.ctx = ctx;
-        tmf.str = NULL;
-    AUTO_RMSTR redis_module_string_t end;
-        end.ctx = ctx;
-        end.str = NULL;
+    AUTO_RMSTR redis_module_string_t tmf = { .ctx = ctx };
+    AUTO_RMSTR redis_module_string_t end = { .ctx = ctx };
     if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "_tmf", &tmf.str,
         "End", &end.str, NULL) == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "expected field(s) missing");
@@ -105,10 +101,11 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     // Create or update the index
     long long end_days = end_time / SECONDS_PER_DAY;
-    AUTO_RMSTR redis_module_string_t idx;
-        idx.ctx = ctx;
-        idx.str = RedisModule_CreateStringPrintf(ctx, "%s:idx:end:%lld",
-            prefix, end_days);
+    AUTO_RMSTR redis_module_string_t idx = {
+        .ctx = ctx,
+        .str = RedisModule_CreateStringPrintf(ctx, "%s:idx:end:%lld",
+            prefix, end_days)
+    };
     AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(ctx, "SADD",
         "sc", idx.str, jobid);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
@@ -159,10 +156,10 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return REDISMODULE_ERR;
     }
 
-    AUTO_RMSTR redis_module_string_t matchset;
-        matchset.ctx = ctx;
-        matchset.str = RedisModule_CreateStringPrintf(ctx, "%s:mat:%s",
-            prefix, uuid);
+    AUTO_RMSTR redis_module_string_t matchset = {
+        .ctx = ctx,
+        .str = RedisModule_CreateStringPrintf(ctx, "%s:mat:%s", prefix, uuid)
+    };
 
     // The range of index keys we will inspect
     long long start_day, end_day, day;
@@ -172,10 +169,11 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     // Inspect each index for jobs that match
     for (day = start_day; day <= end_day; ++day) {
 
-        AUTO_RMSTR redis_module_string_t idx;
-            idx.ctx = ctx;
-            idx.str = RedisModule_CreateStringPrintf(ctx, "%s:idx:end:%lld",
-                prefix, day);
+        AUTO_RMSTR redis_module_string_t idx = {
+            .ctx = ctx,
+            .str = RedisModule_CreateStringPrintf(ctx, "%s:idx:end:%lld",
+                prefix, day)
+        };
         sscan_cursor_init_t init = {
             .ctx = ctx,
             .set = idx.str,
@@ -188,9 +186,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             return REDISMODULE_ERR;
         }
         do {
-            AUTO_RMSTR redis_module_string_t job;
-                job.ctx = ctx;
-                job.str = NULL;
+            AUTO_RMSTR redis_module_string_t job = { .ctx = ctx };
             rc = sscan_next_element(cursor, &job.str);
             if (rc == SSCAN_ERR) {
                 sscan_error(cursor, &err, NULL);
@@ -282,9 +278,7 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     count = 0;
     while (count < max_count) {
         size_t s = 0;
-        AUTO_RMFIELDS redis_module_fields_t fields;
-            fields.ctx = ctx;
-            memset(fields.str, 0, sizeof(fields.str));
+        AUTO_RMFIELDS redis_module_fields_t fields = { .ctx = ctx };
         AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(ctx,
             "ZPOPMIN", "sl", matchset.str, 100);
         if ((RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) ||
@@ -297,18 +291,20 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                 (count < max_count); s += 2) {
             RedisModuleCallReply *subreply =
                 RedisModule_CallReplyArrayElement(reply, s); // no auto
-            AUTO_RMSTR redis_module_string_t job;
-                job.ctx = ctx;
-                job.str = RedisModule_CreateStringFromCallReply(subreply);
+            AUTO_RMSTR redis_module_string_t job = {
+                .ctx = ctx,
+                .str = RedisModule_CreateStringFromCallReply(subreply)
+            };
             long long jobid;
             if (RedisModule_StringToLongLong(job.str, &jobid)
                 == REDISMODULE_ERR) {
                 continue;
             }
-            AUTO_RMSTR redis_module_string_t job_keyname;
-                job_keyname.ctx = ctx;
-                job_keyname.str = RedisModule_CreateStringPrintf(ctx, "%s:%lld",
-                    prefix, jobid);
+            AUTO_RMSTR redis_module_string_t job_keyname = {
+                .ctx = ctx,
+                .str = RedisModule_CreateStringPrintf(ctx, "%s:%lld",
+                    prefix, jobid)
+            };
             AUTO_RMKEY RedisModuleKey *job_key = RedisModule_OpenKey(ctx,
                 job_keyname.str, REDISMODULE_READ);
             if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
