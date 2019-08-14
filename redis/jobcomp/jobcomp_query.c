@@ -40,8 +40,6 @@ typedef struct job_query {
     RedisModuleString *err;
     const char *prefix;
     const char *uuid;
-    // days since unix epoch
-    long long start_day, end_day;
     // secs since unix epoch
     long long start_time, end_time;
     // iso8601 date/times w/tz "Z"
@@ -142,11 +140,9 @@ int job_query_prepare(job_query_t qry)
                 "invalid end time");
             return QUERY_ERR;
         }
-        qry->start_time = start_time;
-        qry->end_time = end_time;
     }
-    qry->start_day = start_time / SECONDS_PER_DAY;
-    qry->end_day = end_time / SECONDS_PER_DAY;
+    qry->start_time = start_time;
+    qry->end_time = end_time;
 
     return QUERY_OK;
 }
@@ -231,7 +227,7 @@ int job_query_start_day(const job_query_t qry, long long *start_day)
 {
     assert(qry != NULL);
     if (start_day) {
-        *start_day = qry->start_day;
+        *start_day = qry->start_time / SECONDS_PER_DAY;
     }
     return QUERY_OK;
 }
@@ -240,7 +236,7 @@ int job_query_end_day(const job_query_t qry, long long *end_day)
 {
     assert(qry != NULL);
     if (end_day) {
-        *end_day = qry->end_day;
+        *end_day = qry->end_time / SECONDS_PER_DAY;
     }
     return QUERY_OK;
 }
