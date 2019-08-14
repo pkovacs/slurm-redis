@@ -151,14 +151,14 @@ int job_query_error(job_query_t qry, const char **err, size_t *len)
     return QUERY_OK;
 }
 
-int job_query_match_job(const job_query_t qry, long long job)
+int job_query_match_job(const job_query_t qry, long long jobid)
 {
     assert(qry != NULL);
-    assert(job > 0);
+    assert(jobid > 0);
 
     // Open job key
     RedisModuleString *job_s = RedisModule_CreateStringPrintf(qry->ctx,
-        "%s:%lld", qry->prefix, job);
+        "%s:%lld", qry->prefix, jobid);
     RedisModuleKey *job_key = RedisModule_OpenKey(qry->ctx, job_s,
         REDISMODULE_READ);
     if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {

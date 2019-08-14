@@ -31,14 +31,14 @@
 
 void close_redis_key(RedisModuleKey **key)
 {
-    if (key) {
+    if (key && *key) {
         RedisModule_CloseKey(*key);
     }
 }
 
 void destroy_redis_reply(RedisModuleCallReply **reply)
 {
-    if (reply) {
+    if (reply && *reply) {
         RedisModule_FreeCallReply(*reply);
         *reply = NULL;
     }
@@ -46,7 +46,7 @@ void destroy_redis_reply(RedisModuleCallReply **reply)
 
 void destroy_redis_module_string(redis_module_string_t *str)
 {
-    if (str) {
+    if (str && str->str) {
         RedisModule_FreeString(str->ctx, str->str);
         str->str = NULL;
     }

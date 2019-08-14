@@ -59,7 +59,7 @@ void destroy_sscan_cursor(sscan_cursor_t *cursor);
 // Return last error and error size byref, integer status (enum)
 int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len);
 
-// Return next element and element size byref, integer status (enum)
-int sscan_next_element(sscan_cursor_t cursor, const char **ret, size_t *len);
+// Return copy of next element byref, integer status (enum)
+int sscan_next_element(sscan_cursor_t cursor, RedisModuleString **str);
 
 #endif /* SSCAN_CURSOR_H */

@@ -35,7 +35,6 @@
 #include "common/iso8601_format.h"
 #include "common/redis_fields.h"
 #include "common/sscan_cursor.h"
-#include "common/stringto.h"
 #include "jobcomp_auto.h"
 #include "jobcomp_query.h"
 
@@ -83,8 +82,8 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         return REDISMODULE_ERR;
     }
 
-    long _tmf;
-    if (sr_strtol(RedisModule_StringPtrLen(tmf.str, NULL), &_tmf) < 0) {
+    long long _tmf;
+    if (RedisModule_StringToLongLong(tmf.str, &_tmf) == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "invalid _tmf");
         return REDISMODULE_ERR;
     }
@@ -97,8 +96,8 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             return REDISMODULE_ERR;
         }
     } else {
-        if (sr_strtoll(RedisModule_StringPtrLen(end.str, NULL),
-            &end_time) < 0) {
+        if (RedisModule_StringToLongLong(end.str, &end_time)
+            == REDISMODULE_ERR) {
             RedisModule_ReplyWithError(ctx, "invalid end date/time");
             return REDISMODULE_ERR;
         }
@@ -189,20 +188,23 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             return REDISMODULE_ERR;
         }
         do {
-            const char *job_c;
-            rc = sscan_next_element(cursor, &job_c, NULL);
+            AUTO_RMSTR redis_module_string_t job;
+                job.ctx = ctx;
+                job.str = NULL;
+            rc = sscan_next_element(cursor, &job.str);
             if (rc == SSCAN_ERR) {
                 sscan_error(cursor, &err, NULL);
                 RedisModule_ReplyWithError(ctx, err);
                 return REDISMODULE_ERR;
             }
-            if ((rc == SSCAN_OK) && *job_c) {
-                long long job;
-                if (sr_strtoll(job_c, &job) < 0) {
+            if ((rc == SSCAN_OK) && job.str) {
+                long long jobid;
+                if (RedisModule_StringToLongLong(job.str, &jobid)
+                    == REDISMODULE_ERR) {
                     RedisModule_ReplyWithError(ctx, "invalid job id");
                     return REDISMODULE_ERR;
                 }
-                int job_match = job_query_match_job(qry, job);
+                int job_match = job_query_match_job(qry, jobid);
                 if (job_match == QUERY_ERR) {
                     job_query_error(qry, &err, NULL);
                     RedisModule_ReplyWithError(ctx, err);
@@ -213,7 +215,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                     // pop them off in SLURMFC.FETCH in job sorted order
                     AUTO_RMREPLY RedisModuleCallReply *reply =
                         RedisModule_Call(ctx, "ZADD", "sll", matchset.str,
-                        job, job);
+                        jobid, jobid);
                 }
             }
         } while (rc != SSCAN_EOF);
@@ -295,15 +297,18 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
                 (count < max_count); s += 2) {
             RedisModuleCallReply *subreply =
                 RedisModule_CallReplyArrayElement(reply, s); // no auto
-            const char *job_c = RedisModule_CallReplyStringPtr(subreply, NULL);
-            long long job;
-            if (sr_strtoll(job_c, &job) < 0) {
+            AUTO_RMSTR redis_module_string_t job;
+                job.ctx = ctx;
+                job.str = RedisModule_CreateStringFromCallReply(subreply);
+            long long jobid;
+            if (RedisModule_StringToLongLong(job.str, &jobid)
+                == REDISMODULE_ERR) {
                 continue;
             }
             AUTO_RMSTR redis_module_string_t job_keyname;
                 job_keyname.ctx = ctx;
                 job_keyname.str = RedisModule_CreateStringPrintf(ctx, "%s:%lld",
-                    prefix, job);
+                    prefix, jobid);
             AUTO_RMKEY RedisModuleKey *job_key = RedisModule_OpenKey(ctx,
                 job_keyname.str, REDISMODULE_READ);
             if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {

@@ -64,7 +64,7 @@ int job_query_prepare(job_query_t qry);
 int job_query_error(job_query_t qry, const char **err, size_t *len);
 
 // Check if a job matches job query criteria
-int job_query_match_job(const job_query_t qry, long long job);
+int job_query_match_job(const job_query_t qry, long long jobid);
 
 // Return integer start day for query
 int job_query_start_day(const job_query_t qry, long long *start);
