@@ -32,8 +32,13 @@
 
 #define AUTO_PTR(fn) __attribute__((cleanup(fn)))
 
+#cmakedefine HAVE_ASSERT_H
+#cmakedefine HAVE_ERRNO_H
+#cmakedefine HAVE_LIMITS_H
+#cmakedefine HAVE_STDDEF_H
 #cmakedefine HAVE_STDINT_H
 #cmakedefine HAVE_STDIO_H
+#cmakedefine HAVE_STRING_H
 #cmakedefine HAVE_SYS_TYPES_H
 #cmakedefine HAVE_TIME_H
 
