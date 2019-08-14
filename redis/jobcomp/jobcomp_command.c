@@ -41,7 +41,7 @@
 #define FETCH_MAX_COUNT 500
 
 /*
- * SLURMJC.INDEX <prefix> <job>
+ * SLURMJC.INDEX <prefix> <jobid>
  */
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
@@ -70,10 +70,11 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     }
 
     // Fetch the needed job data
+    AUTO_RMSTR redis_module_string_t abi = { .ctx = ctx };
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = ctx };
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "_tmf", &tmf.str,
-        "End", &end.str, NULL) == REDISMODULE_ERR) {
+    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "_abi", &abi.str,
+        "_tmf", &tmf.str, "End", &end.str, NULL) == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "expected field(s) missing");
         return REDISMODULE_ERR;
     }
