@@ -38,9 +38,7 @@
 #include <src/common/xmalloc.h> /* xmalloc, ... */
 #include <src/common/xstring.h> /* xstrdup, ... */
 
-#ifdef ISO8601_DATES
 #include "common/iso8601_format.h"
-#endif
 #include "common/stringto.h"
 #include "common/ttl_hash.h"
 
