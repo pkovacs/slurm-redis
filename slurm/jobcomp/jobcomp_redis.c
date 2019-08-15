@@ -405,8 +405,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         size_t i = 0;
         for (; i < reply->elements; ++i) {
             size_t j = 0;
-            jobcomp_job_rec_t *job = NULL;
-            const redisReply *subreply = reply->element[i]; // not auto
+            const redisReply *subreply = reply->element[i]; // do not AUTO_REPLY
             for (; j < subreply->elements; ++j) {
                 if (subreply->element[j]->type == REDIS_REPLY_STRING) {
                     fields.value[j] = subreply->element[j]->str;
@@ -414,7 +413,9 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
                     fields.value[j] = NULL;
                 }
             }
-            if (jobcomp_redis_format_job(&fields, &job) != SLURM_SUCCESS) {
+            jobcomp_job_rec_t *job = xmalloc(sizeof(jobcomp_job_rec_t));
+            if (jobcomp_redis_format_job(&fields, job) != SLURM_SUCCESS) {
+                jobcomp_destroy_job(job);
                 continue;
             }
             list_append(job_list, job);

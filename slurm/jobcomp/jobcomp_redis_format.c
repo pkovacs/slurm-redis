@@ -78,11 +78,9 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     snprintf(buf, sizeof(buf)-1, "%u", SLURM_REDIS_ABI);
     fields->value[kABI] = xstrdup(buf);
 
-    if (tmf == 1) {
-        fields->value[kTimeFormat] = xstrdup("1");
-    } else {
-        fields->value[kTimeFormat] = xstrdup("0");
-    }
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", tmf);
+    fields->value[kTimeFormat] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->job_id);
@@ -237,28 +235,23 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
 }
 
 int jobcomp_redis_format_job(const redis_fields_t *fields,
-    jobcomp_job_rec_t **job)
+    jobcomp_job_rec_t *job)
 {
     assert(fields != NULL);
     assert(job != NULL);
 
     unsigned long _tmf;
-
-    *job = xmalloc(sizeof(jobcomp_job_rec_t));
-
     if (sr_strtoul(fields->value[kTimeFormat], &_tmf) < 0) {
         return SLURM_ERROR;
     }
 
-    {
-        unsigned long jobid;
-        if (sr_strtoul(fields->value[kJobID], &jobid) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->jobid = (uint32_t)jobid;
+    unsigned long jobid;
+    if (sr_strtoul(fields->value[kJobID], &jobid) < 0) {
+        return SLURM_ERROR;
     }
+    job->jobid = (uint32_t)jobid;
 
-    (*job)->partition = xstrdup(fields->value[kPartition]);
+    job->partition = xstrdup(fields->value[kPartition]);
 
     if (_tmf == 1) {
         // The date/time in redis was an iso8601 string w/tz "Z" (Zero/Zulu),
@@ -270,13 +263,13 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
         time_t submit_time = mk_time(fields->value[kSubmit]);
         time_t eligible_time = mk_time(fields->value[kEligible]);
         slurm_make_time_str(&start_time, buf, sizeof(buf));
-        (*job)->start_time = xstrdup(buf);
+        job->start_time = xstrdup(buf);
         slurm_make_time_str(&end_time, buf, sizeof(buf));
-        (*job)->end_time = xstrdup(buf);
+        job->end_time = xstrdup(buf);
         slurm_make_time_str(&submit_time, buf, sizeof(buf));
-        (*job)->submit_time = xstrdup(buf);
+        job->submit_time = xstrdup(buf);
         slurm_make_time_str(&eligible_time, buf, sizeof(buf));
-        (*job)->eligible_time = xstrdup(buf);
+        job->eligible_time = xstrdup(buf);
     } else {
         // The date/time in redis was an integer string (epoch time),
         // so convert it to a time_t, then use slurm_make_time_str
@@ -295,84 +288,72 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
             return SLURM_ERROR;
         }
         slurm_make_time_str(&start_time, buf, sizeof(buf));
-        (*job)->start_time = xstrdup(buf);
+        job->start_time = xstrdup(buf);
         slurm_make_time_str(&end_time, buf, sizeof(buf));
-        (*job)->end_time = xstrdup(buf);
+        job->end_time = xstrdup(buf);
         slurm_make_time_str(&submit_time, buf, sizeof(buf));
-        (*job)->submit_time = xstrdup(buf);
+        job->submit_time = xstrdup(buf);
         slurm_make_time_str(&eligible_time, buf, sizeof(buf));
-        (*job)->eligible_time = xstrdup(buf);
+        job->eligible_time = xstrdup(buf);
     }
 
-    {
-        long elapsed_time;
-        if (sr_strtol(fields->value[kElapsed], &elapsed_time) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->elapsed_time = (time_t)elapsed_time;
+    long elapsed_time;
+    if (sr_strtol(fields->value[kElapsed], &elapsed_time) < 0) {
+        return SLURM_ERROR;
     }
+    job->elapsed_time = (time_t)elapsed_time;
 
-    {
-        unsigned long uid;
-        if (sr_strtoul(fields->value[kUID], &uid) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->uid = (uint32_t)uid;
-        (*job)->uid_name = xstrdup(fields->value[kUser]);
+    unsigned long uid;
+    if (sr_strtoul(fields->value[kUID], &uid) < 0) {
+        return SLURM_ERROR;
     }
+    job->uid = (uint32_t)uid;
+    job->uid_name = xstrdup(fields->value[kUser]);
 
-    {
-        unsigned long gid;
-        if (sr_strtoul(fields->value[kGID], &gid) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->gid = (uint32_t)gid;
-        (*job)->gid_name = xstrdup(fields->value[kGroup]);
+    unsigned long gid;
+    if (sr_strtoul(fields->value[kGID], &gid) < 0) {
+        return SLURM_ERROR;
     }
+    job->gid = (uint32_t)gid;
+    job->gid_name = xstrdup(fields->value[kGroup]);
 
-    {
-        unsigned long nnodes;
-        if (sr_strtoul(fields->value[kNNodes], &nnodes) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->node_cnt = (uint32_t)nnodes;
+    unsigned long nnodes;
+    if (sr_strtoul(fields->value[kNNodes], &nnodes) < 0) {
+        return SLURM_ERROR;
     }
+    job->node_cnt = (uint32_t)nnodes;
 
-    {
-        unsigned long ncpus;
-        if (sr_strtoul(fields->value[kNCPUs], &ncpus) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->proc_cnt = (uint32_t)ncpus;
+    unsigned long ncpus;
+    if (sr_strtoul(fields->value[kNCPUs], &ncpus) < 0) {
+        return SLURM_ERROR;
     }
+    job->proc_cnt = (uint32_t)ncpus;
 
-    {
-        unsigned long state;
-        if (sr_strtoul(fields->value[kState], &state) < 0) {
-            return SLURM_ERROR;
-        }
-        (*job)->state = xstrdup(job_state_string((uint32_t)state));
+    unsigned long state;
+    if (sr_strtoul(fields->value[kState], &state) < 0) {
+        return SLURM_ERROR;
     }
+    job->state = xstrdup(job_state_string((uint32_t)state));
 
     if (*fields->value[kTimeLimit] == 'I') {
-        (*job)->timelimit = xstrdup("INFINITE");
+        job->timelimit = xstrdup("INFINITE");
     } else if (*fields->value[kTimeLimit] == 'P') {
-        (*job)->timelimit = xstrdup("Partition_Limit");
+        job->timelimit = xstrdup("Partition_Limit");
     } else {
-        (*job)->timelimit = xstrdup(fields->value[kTimeLimit]);
+        job->timelimit = xstrdup(fields->value[kTimeLimit]);
     }
 
-    (*job)->nodelist = xstrdup(fields->value[kNodeList]);
-    (*job)->jobname = xstrdup(fields->value[kJobName]);
-    (*job)->work_dir = xstrdup(fields->value[kWorkDir]);
-    (*job)->resv_name = xstrdup(fields->value[kReservation]);
-    (*job)->req_gres = xstrdup(fields->value[kReqGRES]);
-    (*job)->account = xstrdup(fields->value[kAccount]);
-    (*job)->qos_name = xstrdup(fields->value[kQOS]);
-    (*job)->wckey = xstrdup(fields->value[kWCKey]);
-    (*job)->cluster = xstrdup(fields->value[kCluster]);
-    (*job)->derived_ec = xstrdup(fields->value[kDerivedExitCode]);
-    (*job)->exit_code = xstrdup(fields->value[kExitCode]);
+    job->nodelist = xstrdup(fields->value[kNodeList]);
+    job->jobname = xstrdup(fields->value[kJobName]);
+    job->work_dir = xstrdup(fields->value[kWorkDir]);
+    job->resv_name = xstrdup(fields->value[kReservation]);
+    job->req_gres = xstrdup(fields->value[kReqGRES]);
+    job->account = xstrdup(fields->value[kAccount]);
+    job->qos_name = xstrdup(fields->value[kQOS]);
+    job->wckey = xstrdup(fields->value[kWCKey]);
+    job->cluster = xstrdup(fields->value[kCluster]);
+    job->derived_ec = xstrdup(fields->value[kDerivedExitCode]);
+    job->exit_code = xstrdup(fields->value[kExitCode]);
 
     return SLURM_SUCCESS;
 }
