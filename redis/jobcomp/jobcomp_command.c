@@ -290,11 +290,10 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             (RedisModule_CallReplyLength(reply)) == 0) {
             break;
         }
-        s = 0;
         for (s = 0; (s < RedisModule_CallReplyLength(reply)) &&
                 (count < max_count); s += 2) {
-            RedisModuleCallReply *subreply =
-                RedisModule_CallReplyArrayElement(reply, s); // no auto
+            RedisModuleCallReply *subreply = // no AUTO_RMREPLY
+                RedisModule_CallReplyArrayElement(reply, s);
             AUTO_RMSTR redis_module_string_t job = {
                 .ctx = ctx,
                 .str = RedisModule_CreateStringFromCallReply(subreply)
