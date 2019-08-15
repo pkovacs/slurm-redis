@@ -133,7 +133,9 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
         }
         end_time = job->end_time;
     }
-    fields->value[kState] = xstrdup(job_state_string(job_state));
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf)-1, "%u", job_state);
+    fields->value[kState] = xstrdup(buf);
 
     fields->value[kStart] = jobcomp_redis_format_time(tmf, start_time);
     fields->value[kEnd] = jobcomp_redis_format_time(tmf, end_time);
@@ -153,9 +155,9 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     }
 
     if (job->time_limit == INFINITE) {
-        fields->value[kTimeLimit] = xstrdup("UNLIMITED");
+        fields->value[kTimeLimit] = xstrdup("I");
     } else if (job->time_limit == NO_VAL) {
-        fields->value[kTimeLimit] = xstrdup("Partition_Limit");
+        fields->value[kTimeLimit] = xstrdup("P");
     } else {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf)-1, "%u", job->time_limit);
@@ -344,10 +346,24 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
         (*job)->proc_cnt = (uint32_t)ncpus;
     }
 
+    {
+        unsigned long state;
+        if (sr_strtoul(fields->value[kState], &state) < 0) {
+            return SLURM_ERROR;
+        }
+        (*job)->state = xstrdup(job_state_string((uint32_t)state));
+    }
+
+    if (*fields->value[kTimeLimit] == 'I') {
+        (*job)->timelimit = xstrdup("INFINITE");
+    } else if (*fields->value[kTimeLimit] == 'P') {
+        (*job)->timelimit = xstrdup("Partition_Limit");
+    } else {
+        (*job)->timelimit = xstrdup(fields->value[kTimeLimit]);
+    }
+
     (*job)->nodelist = xstrdup(fields->value[kNodeList]);
     (*job)->jobname = xstrdup(fields->value[kJobName]);
-    (*job)->state = xstrdup(fields->value[kState]);
-    (*job)->timelimit = xstrdup(fields->value[kTimeLimit]);
     (*job)->work_dir = xstrdup(fields->value[kWorkDir]);
     (*job)->resv_name = xstrdup(fields->value[kReservation]);
     (*job)->req_gres = xstrdup(fields->value[kReqGRES]);
