@@ -191,7 +191,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
         return SLURM_ERROR;
     }
 
-    AUTO_FIELDS redis_fields_t *fields = NULL;
+    AUTO_FIELDS redis_fields_t fields = {0};
     int rc = jobcomp_redis_format_fields(_tmf, job, &fields);
     if (rc != SLURM_SUCCESS) {
         return SLURM_ERROR;
@@ -206,22 +206,22 @@ int slurm_jobcomp_log_record(struct job_record *job)
 
     // Add the job's field-value pairs to a redis hash set
     for (i = 0; i < MAX_REDIS_FIELDS; ++i) {
-        if (fields->value[i]) {
+        if (fields.value[i]) {
             redisAppendCommand(ctx, "HSET %s:%s %s %s", prefix,
-                fields->value[kJobID], redis_field_labels[i],
-                fields->value[i]);
+                fields.value[kJobID], redis_field_labels[i],
+                fields.value[i]);
             ++pipeline;
         }
     }
     if (TTL > 0) {
         redisAppendCommand(ctx, "EXPIRE %s:%s %lld", prefix,
-            fields->value[kJobID], TTL);
+            fields.value[kJobID], TTL);
         ++pipeline;
     }
 
     // Use SLURMJC.INDEX to index the job on the redis server
     redisAppendCommand(ctx, "SLURMJC.INDEX %s %s", prefix,
-        fields->value[kJobID]);
+        fields.value[kJobID]);
     ++pipeline;
 
     // Pop the pipeline replies
@@ -240,11 +240,11 @@ int slurm_jobcomp_log_record(struct job_record *job)
     AUTO_REPLY redisReply *reply = NULL;
     if (err) {
         slurm_debug("discarding redis transaction for job %s",
-            fields->value[kJobID]);
+            fields.value[kJobID]);
         reply = redisCommand(ctx, "DISCARD");
     } else {
         slurm_debug("committing redis transaction for job %s",
-            fields->value[kJobID]);
+            fields.value[kJobID]);
         reply = redisCommand(ctx, "EXEC");
     }
 
@@ -394,7 +394,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     // Use SLURMJC.FETCH to pull down the matching jobs in chunks and build
     // the return jobcomp list for slurm
     do {
-        redis_fields_t fields; // stack is ok
+        redis_fields_t fields; // do not AUTO_FIELDS
         AUTO_REPLY redisReply *reply = redisCommand(ctx,
             "SLURMJC.FETCH %s %s 500", prefix, uuid_s);
         if (!reply || (reply->type == REDIS_REPLY_NIL) ||

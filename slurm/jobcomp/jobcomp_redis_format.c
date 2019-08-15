@@ -67,54 +67,53 @@ void jobcomp_redis_format_fini()
 }
 
 int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
-    redis_fields_t **fields)
+    redis_fields_t *fields)
 {
     assert(job != NULL);
     assert(fields != NULL);
-    *fields = xmalloc(sizeof(redis_fields_t));
 
     char buf[64];
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", SLURM_REDIS_ABI);
-    (*fields)->value[kABI] = xstrdup(buf);
+    fields->value[kABI] = xstrdup(buf);
 
     if (tmf == 1) {
-        (*fields)->value[kTimeFormat] = xstrdup("1");
+        fields->value[kTimeFormat] = xstrdup("1");
     } else {
-        (*fields)->value[kTimeFormat] = xstrdup("0");
+        fields->value[kTimeFormat] = xstrdup("0");
     }
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->job_id);
-    (*fields)->value[kJobID] = xstrdup(buf);
+    fields->value[kJobID] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->user_id);
-    (*fields)->value[kUID] = xstrdup(buf);
+    fields->value[kUID] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->group_id);
-    (*fields)->value[kGID] = xstrdup(buf);
+    fields->value[kGID] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->node_cnt);
-    (*fields)->value[kNNodes] = xstrdup(buf);
+    fields->value[kNNodes] = xstrdup(buf);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%u", job->total_cpus);
-    (*fields)->value[kNCPUs] = xstrdup(buf);
+    fields->value[kNCPUs] = xstrdup(buf);
 
-    if (ttl_hash_get(user_cache, job->user_id, &(*fields)->value[kUser])
+    if (ttl_hash_get(user_cache, job->user_id, &fields->value[kUser])
         != HASH_OK) {
-        (*fields)->value[kUser] = uid_to_string(job->user_id);
-        ttl_hash_set(user_cache, job->user_id, (*fields)->value[kUser]);
+        fields->value[kUser] = uid_to_string(job->user_id);
+        ttl_hash_set(user_cache, job->user_id, fields->value[kUser]);
     }
 
-    if (ttl_hash_get(group_cache, job->group_id, &(*fields)->value[kGroup])
+    if (ttl_hash_get(group_cache, job->group_id, &fields->value[kGroup])
         != HASH_OK) {
-        (*fields)->value[kGroup] = gid_to_string(job->group_id);
-        ttl_hash_set(group_cache, job->group_id, (*fields)->value[kGroup]);
+        fields->value[kGroup] = gid_to_string(job->group_id);
+        ttl_hash_set(group_cache, job->group_id, fields->value[kGroup]);
     }
 
     uint32_t job_state;
@@ -134,33 +133,33 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
         }
         end_time = job->end_time;
     }
-    (*fields)->value[kState] = xstrdup(job_state_string(job_state));
+    fields->value[kState] = xstrdup(job_state_string(job_state));
 
-    (*fields)->value[kStart] = jobcomp_redis_format_time(tmf, start_time);
-    (*fields)->value[kEnd] = jobcomp_redis_format_time(tmf, end_time);
+    fields->value[kStart] = jobcomp_redis_format_time(tmf, start_time);
+    fields->value[kEnd] = jobcomp_redis_format_time(tmf, end_time);
 
     memset(buf, 0, sizeof(buf));
     snprintf(buf, sizeof(buf)-1, "%ld",
         (long int)difftime(end_time, start_time));
-    (*fields)->value[kElapsed] = xstrdup(buf);
+    fields->value[kElapsed] = xstrdup(buf);
 
-    (*fields)->value[kPartition] = xstrdup(job->partition);
-    (*fields)->value[kNodeList] = xstrdup(job->nodes);
+    fields->value[kPartition] = xstrdup(job->partition);
+    fields->value[kNodeList] = xstrdup(job->nodes);
 
     if (job->name && *job->name) {
-        (*fields)->value[kJobName] = xstrdup(job->name);
+        fields->value[kJobName] = xstrdup(job->name);
     } else {
-        (*fields)->value[kJobName] = xstrdup("allocation");
+        fields->value[kJobName] = xstrdup("allocation");
     }
 
     if (job->time_limit == INFINITE) {
-        (*fields)->value[kTimeLimit] = xstrdup("UNLIMITED");
+        fields->value[kTimeLimit] = xstrdup("UNLIMITED");
     } else if (job->time_limit == NO_VAL) {
-        (*fields)->value[kTimeLimit] = xstrdup("Partition_Limit");
+        fields->value[kTimeLimit] = xstrdup("Partition_Limit");
     } else {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf)-1, "%u", job->time_limit);
-        (*fields)->value[kTimeLimit] = xstrdup(buf);
+        fields->value[kTimeLimit] = xstrdup(buf);
     }
 
     // Below and all the way to the bottom of the function are data for which
@@ -169,41 +168,41 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
 
     if (job->details) {
         if (job->details->submit_time) {
-            (*fields)->value[kSubmit] = jobcomp_redis_format_time(tmf,
+            fields->value[kSubmit] = jobcomp_redis_format_time(tmf,
                 job->details->submit_time);
         }
         if (job->details->begin_time) {
-            (*fields)->value[kEligible] = jobcomp_redis_format_time(tmf,
+            fields->value[kEligible] = jobcomp_redis_format_time(tmf,
                 job->details->begin_time);
         }
         if (job->details->work_dir && *job->details->work_dir) {
-            (*fields)->value[kWorkDir] = xstrdup(job->details->work_dir);
+            fields->value[kWorkDir] = xstrdup(job->details->work_dir);
         }
     }
 
     if (job->resv_name && *job->resv_name) {
-        (*fields)->value[kReservation] = strdup(job->resv_name);
+        fields->value[kReservation] = xstrdup(job->resv_name);
     }
 
     if (job->gres_req && *job->gres_req) {
-        (*fields)->value[kReqGRES] = strdup(job->gres_req);
+        fields->value[kReqGRES] = xstrdup(job->gres_req);
     }
 
     if (job->account && *job->account) {
-        (*fields)->value[kAccount] = strdup(job->account);
+        fields->value[kAccount] = xstrdup(job->account);
     }
 
     if (job->qos_ptr && job->qos_ptr->name && *job->qos_ptr->name) {
-        (*fields)->value[kQOS] = strdup(job->qos_ptr->name);
+        fields->value[kQOS] = xstrdup(job->qos_ptr->name);
     }
 
     if (job->wckey && *job->wckey) {
-        (*fields)->value[kWCKey] = strdup(job->wckey);
+        fields->value[kWCKey] = xstrdup(job->wckey);
     }
 
     if (job->assoc_ptr && job->assoc_ptr->cluster
         && *job->assoc_ptr->cluster) {
-        (*fields)->value[kCluster] = strdup(job->assoc_ptr->cluster);
+        fields->value[kCluster] = xstrdup(job->assoc_ptr->cluster);
     }
 
     int ec1 = 0, ec2 = 0;
@@ -216,7 +215,7 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     if (ec1 || ec2) {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
-        (*fields)->value[kDerivedExitCode] = xstrdup(buf);
+        fields->value[kDerivedExitCode] = xstrdup(buf);
     }
 
     ec1 = ec2 = 0;
@@ -229,7 +228,7 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     if (ec1 || ec2) {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf)-1, "%d:%d", ec1, ec2);
-        (*fields)->value[kExitCode] = xstrdup(buf);
+        fields->value[kExitCode] = xstrdup(buf);
     }
 
     return SLURM_SUCCESS;

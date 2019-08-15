@@ -30,7 +30,12 @@
 
 #include <src/common/list.h> /* ListIterator, ... */
 
-#include "jobcomp_redis_format.h"
+#include "common/redis_fields.h"
+
+// AUTO_FIELDS redis_fields_t will auto delete the contained value array
+typedef struct redis_fields {
+    char *value[MAX_REDIS_FIELDS];
+} redis_fields_t;
 
 #define AUTO_STR AUTO_PTR(destroy_string)
 #define AUTO_LITER AUTO_PTR(destroy_list_iterator)
@@ -39,7 +44,7 @@
 
 void destroy_string(char **str);
 void destroy_list_iterator(ListIterator *it);
-void destroy_redis_fields(redis_fields_t **fields);
+void destroy_redis_fields(redis_fields_t *fields);
 void destroy_redis_reply(redisReply **reply);
 
 #endif /* JOBCOMP_REDIS_AUTO_H */

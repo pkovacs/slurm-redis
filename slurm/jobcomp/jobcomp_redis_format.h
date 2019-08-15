@@ -32,7 +32,8 @@
 #include <src/common/slurm_jobcomp.h> /* jobcomp_job_rec_t */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
-#include <common/redis_fields.h>
+#include "common/redis_fields.h"
+#include "jobcomp_redis_auto.h"
 
 /*
  * From slurm/src/common/slurm_jobcomp.h: the jobcomp_job_rec_t below
@@ -75,11 +76,6 @@ typedef struct {
 } jobcomp_job_rec_t;
  */
 
-// Array of redis field values
-typedef struct redis_fields {
-    char *value[MAX_REDIS_FIELDS];
-} redis_fields_t;
-
 // Job formatter initialization
 typedef struct jobcomp_redis_format_init {
     // Number of uid->user_name cache entries
@@ -100,9 +96,9 @@ void jobcomp_redis_format_fini();
 
 // Format redis fields from a struct job_record (slurm to redis)
 int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
-    redis_fields_t **fields);
+    redis_fields_t *fields);
 
-// Format a jobcomp_job_rec_t from redis fields (redis to slurm)
+// Create and format a jobcomp_job_rec_t from redis fields (redis to slurm)
 int jobcomp_redis_format_job(const redis_fields_t *fields,
     jobcomp_job_rec_t **job);
 

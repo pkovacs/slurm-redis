@@ -33,35 +33,35 @@
 
 void destroy_string(char **str)
 {
-    if (str) {
+    if (str && *str) {
         xfree(*str);
+        *str = NULL;
     }
 }
 
 void destroy_list_iterator(ListIterator *it)
 {
-    if (it) {
+    if (it && *it) {
         list_iterator_destroy(*it);
         *it = NULL;
     }
 }
 
-void destroy_redis_fields(redis_fields_t **fields)
+void destroy_redis_fields(redis_fields_t *fields)
 {
     if (fields) {
         size_t i = 0;
         for (; i < MAX_REDIS_FIELDS; ++i) {
-            if ((*fields)->value[i]) {
-                xfree((*fields)->value[i]);
+            if (fields->value[i]) {
+                xfree(fields->value[i]);
             }
         }
-        xfree(*fields);
     }
 }
 
 void destroy_redis_reply(redisReply **reply)
 {
-    if (reply) {
+    if (reply && *reply) {
         freeReplyObject(*reply);
         *reply = NULL;
     }
