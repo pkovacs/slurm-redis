@@ -95,8 +95,11 @@ int job_query_prepare(job_query_t qry)
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
-    if (RedisModule_HashGet(query_key, REDISMODULE_HASH_CFIELDS, "_abi",
-        &abi.str, "_tmf", &tmf.str, "Start", &start.str, "End", &end.str,
+    if (RedisModule_HashGet(query_key, REDISMODULE_HASH_CFIELDS,
+        redis_field_labels[kABI], &abi.str,
+        redis_field_labels[kTimeFormat], &tmf.str,
+        redis_field_labels[kStart], &start.str,
+        redis_field_labels[kEnd], &end.str,
         NULL) == REDISMODULE_ERR) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "error fetching query data");
@@ -184,8 +187,11 @@ int job_query_match_job(const job_query_t qry, long long jobid)
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
-    if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS, "_abi",
-        &abi.str, "_tmf", &tmf.str, "Start", &start.str, "End", &end.str,
+    if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
+        redis_field_labels[kABI], &abi.str,
+        redis_field_labels[kTimeFormat], &tmf.str,
+        redis_field_labels[kStart], &start.str,
+        redis_field_labels[kEnd], &end.str,
         NULL) == REDISMODULE_ERR) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "error fetching job data");

@@ -73,8 +73,11 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     AUTO_RMSTR redis_module_string_t abi = { .ctx = ctx };
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = ctx };
-    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS, "_abi", &abi.str,
-        "_tmf", &tmf.str, "End", &end.str, NULL) == REDISMODULE_ERR) {
+    if (RedisModule_HashGet(key, REDISMODULE_HASH_CFIELDS,
+        redis_field_labels[kABI], &abi.str,
+        redis_field_labels[kTimeFormat], &tmf.str,
+        redis_field_labels[kEnd], &end.str,
+        NULL) == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "expected field(s) missing");
         return REDISMODULE_ERR;
     }

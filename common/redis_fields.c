@@ -48,7 +48,7 @@ const char *redis_field_labels[] = {
     "State",
     "TimeLimit",
     "WorkDir",
-    "Reservation",
+    "ResvName",
     "ReqGRES",
     "Account",
     "QOS",
@@ -56,7 +56,7 @@ const char *redis_field_labels[] = {
     "Cluster",
     "Submit",
     "Eligible",
-    "DerivedExitCode",
-    "ExitCode"
+    "DerivedEC",
+    "EC"
 };
 

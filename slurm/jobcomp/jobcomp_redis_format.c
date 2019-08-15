@@ -254,7 +254,7 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     job->partition = xstrdup(fields->value[kPartition]);
 
     if (_tmf == 1) {
-        // The date/time in redis was an iso8601 string w/tz "Z" (Zero/Zulu),
+        // The date/time in redis is an iso8601 string w/tz "Z" (Zero/Zulu),
         // so first use our mk_time function to convert it back to time_t,
         // then use slurm_make_time_str to format it for slurm
         char buf[32];
@@ -271,7 +271,7 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
         slurm_make_time_str(&eligible_time, buf, sizeof(buf));
         job->eligible_time = xstrdup(buf);
     } else {
-        // The date/time in redis was an integer string (epoch time),
+        // The date/time in redis is an integer string (epoch time),
         // so convert it to a time_t, then use slurm_make_time_str
         char buf[32];
         time_t start_time, end_time, submit_time, eligible_time;
@@ -352,8 +352,18 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     job->qos_name = xstrdup(fields->value[kQOS]);
     job->wckey = xstrdup(fields->value[kWCKey]);
     job->cluster = xstrdup(fields->value[kCluster]);
-    job->derived_ec = xstrdup(fields->value[kDerivedExitCode]);
-    job->exit_code = xstrdup(fields->value[kExitCode]);
+
+    if (!fields->value[kDerivedExitCode]) {
+        job->derived_ec = xstrdup("0:0");
+    } else {
+        job->derived_ec = xstrdup(fields->value[kDerivedExitCode]);
+    }
+
+    if (!fields->value[kExitCode]) {
+        job->exit_code = xstrdup("0:0");
+    } else {
+        job->exit_code = xstrdup(fields->value[kExitCode]);
+    }
 
     return SLURM_SUCCESS;
 }

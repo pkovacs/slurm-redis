@@ -38,6 +38,7 @@
 #include <src/common/xstring.h> /* xstrdup, ... */
 #include <src/slurmctld/slurmctld.h> /* struct job_record */
 
+#include "common/redis_fields.h"
 #include "jobcomp_redis_auto.h"
 #include "jobcomp_redis_format.h"
 
@@ -315,9 +316,12 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
             job_cond->usage_start);
         AUTO_STR char *end = jobcomp_redis_format_time(_tmf,
             job_cond->usage_end);
-        redisAppendCommand(ctx, "HSET %s:qry:%s _abi %u _tmf %u "
-            "Start %s End %s",
-            prefix, uuid_s, SLURM_REDIS_ABI, _tmf, start, end);
+        redisAppendCommand(ctx, "HSET %s:qry:%s %s %u %s %u "
+            "%s %s %s %s", prefix, uuid_s,
+            redis_field_labels[kABI], SLURM_REDIS_ABI,
+            redis_field_labels[kTimeFormat], _tmf,
+            redis_field_labels[kStart], start,
+            redis_field_labels[kEnd], end);
         redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
             QUERY_TTL);
         pipeline += 2;
