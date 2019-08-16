@@ -103,11 +103,27 @@ static int redis_connected(void)
 }
 
 static int redis_add_job_criteria(const char *key, const List list) {
-    char *value;
     int pipeline = 0;
+    const char *value;
     AUTO_LITER ListIterator it = list_iterator_create(list);
     while ((value = list_next(it))) {
         redisAppendCommand(ctx, "SADD %s %s", key, value);
+        ++pipeline;
+    }
+    redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_TTL);
+    ++pipeline;
+    return pipeline;
+}
+
+static int redis_add_job_steps(const char *key, const List list) {
+    int pipeline = 0;
+    char buf[32];
+    const slurmdb_selected_step_t *step;
+    AUTO_LITER ListIterator it = list_iterator_create(list);
+    while ((step = list_next(it))) {
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf)-1, "%u", step->jobid);
+        redisAppendCommand(ctx, "SADD %s %s", key, buf);
         ++pipeline;
     }
     redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_TTL);
@@ -254,9 +270,9 @@ int slurm_jobcomp_log_record(struct job_record *job)
 
 #if 0
 typedef struct {
-    List acct_list;     /* list of char * */
+ *  List acct_list;     /* list of char * */
     List associd_list;  /* list of char */
-    List cluster_list;  /* list of char * */
+ -  List cluster_list;  /* list of char * */ /* sacct: requires cluster in accounting or will reject */
     uint32_t cpus_max;  /* number of cpus high range */
     uint32_t cpus_min;  /* number of cpus low range */
     int32_t exitcode;   /* exit code of job */
@@ -267,11 +283,11 @@ typedef struct {
     uint32_t nodes_max; /* number of nodes high range */
     uint32_t nodes_min; /* number of nodes low range */
  *  List partition_list;/* list of char * */
-    List qos_list;      /* list of char * */
-    List resv_list;     /* list of char * */
-    List resvid_list;   /* list of char * */
-    List state_list;    /* list of char * */
-    List step_list;     /* list of slurmdb_selected_step_t */
+ -  List qos_list;      /* list of char * */  /* sacct: requires qos in accounting or will reject */
+ -  List resv_list;     /* list of char * */  /* sacct: not supported as an input option */
+ -  List resvid_list;   /* list of char * */  /* sacct: not supported as an input option */
+ *  List state_list;    /* list of char * */
+ *  List step_list;     /* list of slurmdb_selected_step_t */
     uint32_t timelimit_max; /* max timelimit */
     uint32_t timelimit_min; /* min timelimit */
  *  time_t usage_end;
@@ -327,6 +343,13 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         pipeline += 2;
     }
 
+    // Create redis set for account_list
+    if ((job_cond->acct_list) && list_count(job_cond->acct_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:acc", prefix, uuid_s);
+        pipeline += redis_add_job_criteria(key, job_cond->acct_list);
+    }
+
     // Create redis set for userid_list
     if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
@@ -344,15 +367,29 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     // Create redis set for jobname_list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:jobname", prefix, uuid_s);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:jnm", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->jobname_list);
     }
 
     // Create redis set for partition_list
     if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:partition", prefix, uuid_s);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:prt", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
+    }
+
+    // Create redis set for state_list
+    if ((job_cond->state_list) && list_count(job_cond->state_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:stt", prefix, uuid_s);
+        pipeline += redis_add_job_criteria(key, job_cond->state_list);
+    }
+
+    // Create redis set for step_list
+    if ((job_cond->step_list) && list_count(job_cond->step_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:stp", prefix, uuid_s);
+        pipeline += redis_add_job_steps(key, job_cond->step_list);
     }
 
     // Pop the pipeline replies
