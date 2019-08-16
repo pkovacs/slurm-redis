@@ -272,7 +272,7 @@ int slurm_jobcomp_log_record(struct job_record *job)
 typedef struct {
  *  List acct_list;     /* list of char * */
     List associd_list;  /* list of char */
- -  List cluster_list;  /* list of char * */ /* sacct: requires cluster in accounting or will reject */
+ *  List cluster_list;  /* list of char * */ /* sacct: requires cluster in accounting or will reject */
     uint32_t cpus_max;  /* number of cpus high range */
     uint32_t cpus_min;  /* number of cpus low range */
     int32_t exitcode;   /* exit code of job */
@@ -348,6 +348,13 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:acc", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->acct_list);
+    }
+
+    // Create redis set for cluster_list
+    if ((job_cond->cluster_list) && list_count(job_cond->cluster_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:cls", prefix, uuid_s);
+        pipeline += redis_add_job_criteria(key, job_cond->cluster_list);
     }
 
     // Create redis set for userid_list
