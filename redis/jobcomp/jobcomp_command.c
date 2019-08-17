@@ -34,7 +34,6 @@
 
 #include "common/iso8601_format.h"
 #include "common/redis_fields.h"
-#include "common/sscan_cursor.h"
 #include "jobcomp_auto.h"
 #include "jobcomp_query.h"
 
@@ -150,14 +149,14 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     };
     AUTO_PTR(destroy_job_query) job_query_t qry = create_job_query(&init);
     rc = job_query_prepare(qry);
-    if (rc == QUERY_NULL) {
-        RedisModule_ReplyWithNull(ctx);
-        return REDISMODULE_OK;
-    }
     if (rc == QUERY_ERR) {
         job_query_error(qry, &err, NULL);
         RedisModule_ReplyWithError(ctx, err);
         return REDISMODULE_ERR;
+    }
+    if (rc == QUERY_NULL) {
+        RedisModule_ReplyWithNull(ctx);
+        return REDISMODULE_OK;
     }
 
     AUTO_RMSTR redis_module_string_t matchset = {
@@ -165,60 +164,15 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         .str = RedisModule_CreateStringPrintf(ctx, "%s:mat:%s", prefix, uuid)
     };
 
-    // The range of index keys we will inspect
-    long long start_day, end_day, day;
-    job_query_start_day(qry, &start_day);
-    job_query_end_day(qry, &end_day);
-
-    // Inspect each index for jobs that match
-    for (day = start_day; day <= end_day; ++day) {
-
-        AUTO_RMSTR redis_module_string_t idx = {
-            .ctx = ctx,
-            .str = RedisModule_CreateStringPrintf(ctx, "%s:idx:end:%lld",
-                prefix, day)
-        };
-        sscan_cursor_init_t init = {
-            .ctx = ctx,
-            .set = idx.str,
-            .count = 500
-        };
-        AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
-            create_sscan_cursor(&init);
-        if (sscan_error(cursor, &err, NULL) == SSCAN_ERR) {
-            RedisModule_ReplyWithError(ctx, err);
-            return REDISMODULE_ERR;
-        }
-        do {
-            AUTO_RMSTR redis_module_string_t job = { .ctx = ctx };
-            rc = sscan_next_element(cursor, &job.str);
-            if (rc == SSCAN_ERR) {
-                sscan_error(cursor, &err, NULL);
-                RedisModule_ReplyWithError(ctx, err);
-                return REDISMODULE_ERR;
-            }
-            if ((rc == SSCAN_OK) && job.str) {
-                long long jobid;
-                if (RedisModule_StringToLongLong(job.str, &jobid)
-                    == REDISMODULE_ERR) {
-                    RedisModule_ReplyWithError(ctx, "invalid job id");
-                    return REDISMODULE_ERR;
-                }
-                int job_match = job_query_match_job(qry, jobid);
-                if (job_match == QUERY_ERR) {
-                    job_query_error(qry, &err, NULL);
-                    RedisModule_ReplyWithError(ctx, err);
-                    return REDISMODULE_ERR;
-                }
-                if (job_match == QUERY_PASS) {
-                    // Add job to sorted set with score = job so that we can
-                    // pop them off in SLURMFC.FETCH in job sorted order
-                    AUTO_RMREPLY RedisModuleCallReply *reply =
-                        RedisModule_Call(ctx, "ZADD", "sll", matchset.str,
-                        jobid, jobid);
-                }
-            }
-        } while (rc != SSCAN_EOF);
+    rc = job_query_match_jobs(qry, matchset.str);
+    if (rc == QUERY_ERR) {
+        job_query_error(qry, &err, NULL);
+        RedisModule_ReplyWithError(ctx, err);
+        return REDISMODULE_ERR;
+    }
+    if (rc == QUERY_NULL) {
+        RedisModule_ReplyWithNull(ctx);
+        return REDISMODULE_OK;
     }
 
     AUTO_RMKEY RedisModuleKey *matchset_key = RedisModule_OpenKey(ctx,

@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "common/iso8601_format.h"
+#include "common/sscan_cursor.h"
 #include "jobcomp_auto.h"
 
 typedef struct job_query {
@@ -46,7 +47,7 @@ typedef struct job_query {
     // iso8601 date/times w/tz "Z"
     char start_time_c[ISO8601_SZ];
     char end_time_c[ISO8601_SZ];
-    // set-based criteria: arrays and array sizes
+    // arrays for set-based criteria
     RedisModuleString **accounts;
     RedisModuleString **clusters;
     RedisModuleString **gids;
@@ -137,7 +138,7 @@ static int add_job_criteria(job_query_t qry, const RedisModuleString *key,
     }
     *len = RedisModule_CallReplyInteger(reply);
     if (*len > 0) {
-        *arr = RedisModule_Calloc(*len, sizeof(RedisModuleString *));
+        *arr = RedisModule_Calloc(*len, sizeof(long long));
     }
 
     size_t i = 0;
@@ -157,13 +158,87 @@ static int add_job_criteria(job_query_t qry, const RedisModuleString *key,
             .ctx = qry->ctx,
             .str = RedisModule_CreateStringFromCallReply(reply)
         };
-        if (RedisModule_StringToLongLong(job.str, &*arr[i])
+        if (RedisModule_StringToLongLong(job.str, (*arr)+i)
             == REDISMODULE_ERR) {
             return QUERY_ERR;
         }
     }
 
     return QUERY_OK;
+}
+
+static int job_query_check_job(const job_query_t qry, long long jobid)
+{
+    assert(qry != NULL);
+    assert(jobid > 0);
+
+    if (qry->err) {
+        RedisModule_FreeString(qry->ctx, qry->err);
+        qry->err = NULL;
+    }
+
+    // Open job key
+    AUTO_RMSTR redis_module_string_t job_keyname = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:%lld",
+            qry->prefix, jobid)
+    };
+    AUTO_RMKEY RedisModuleKey *job_key = RedisModule_OpenKey(qry->ctx,
+        job_keyname.str, REDISMODULE_READ);
+    if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
+        return QUERY_NULL;
+    }
+    if (RedisModule_KeyType(job_key) != REDISMODULE_KEYTYPE_HASH) {
+        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+            REDISMODULE_ERRORMSG_WRONGTYPE);
+        return QUERY_ERR;
+    }
+
+    // Fetch data on job key
+    AUTO_RMSTR redis_module_string_t abi = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
+    if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
+        redis_field_labels[kABI], &abi.str,
+        redis_field_labels[kTimeFormat], &tmf.str,
+        redis_field_labels[kStart], &start.str,
+        redis_field_labels[kEnd], &end.str,
+        NULL) == REDISMODULE_ERR) {
+        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+            "error fetching job data");
+        return QUERY_ERR;
+    }
+
+    long long _tmf;
+    if (RedisModule_StringToLongLong(tmf.str, &_tmf) == REDISMODULE_ERR) {
+        RedisModule_ReplyWithError(qry->ctx, "invalid _tmf");
+        return QUERY_ERR;
+    }
+
+    if (_tmf == 1) {
+        const char *start_c = RedisModule_StringPtrLen(start.str, NULL);
+        const char *end_c = RedisModule_StringPtrLen(end.str, NULL);
+        if (strncmp(qry->start_time_c, start_c, ISO8601_SZ-1) > 0 ||
+                strncmp(qry->end_time_c, end_c, ISO8601_SZ-1) < 0) {
+            return QUERY_FAIL;
+        }
+    } else {
+        long long start_time, end_time;
+        if (RedisModule_StringToLongLong(start.str, &start_time)
+            == REDISMODULE_ERR) {
+            return QUERY_FAIL;
+        }
+        if (RedisModule_StringToLongLong(end.str, &end_time)
+            == REDISMODULE_ERR) {
+            return QUERY_FAIL;
+        }
+        if (qry->start_time > start_time || qry->end_time < end_time) {
+            return QUERY_FAIL;
+        }
+    }
+
+    return QUERY_PASS;
 }
 
 job_query_t create_job_query(const job_query_init_t *init)
@@ -369,7 +444,7 @@ int job_query_prepare(job_query_t qry)
             == QUERY_ERR) ||
         (add_criteria(qry, gid_key.str, &qry->gids, &qry->gids_sz)
             == QUERY_ERR) ||
-        (add_job_criteria(qry, gid_key.str, &qry->jobs, &qry->jobs_sz)
+        (add_job_criteria(qry, job_key.str, &qry->jobs, &qry->jobs_sz)
             == QUERY_ERR) ||
         (add_criteria(qry, jobname_key.str, &qry->jobnames, &qry->jobnames_sz)
             == QUERY_ERR) ||
@@ -395,94 +470,82 @@ int job_query_error(job_query_t qry, const char **err, size_t *len)
     return QUERY_OK;
 }
 
-int job_query_match_job(const job_query_t qry, long long jobid)
+int job_query_match_jobs(job_query_t qry, const RedisModuleString *matchset)
 {
     assert(qry != NULL);
-    assert(jobid > 0);
 
     if (qry->err) {
         RedisModule_FreeString(qry->ctx, qry->err);
         qry->err = NULL;
     }
 
-    // Open the job key
-    AUTO_RMSTR redis_module_string_t job_keyname = {
-        .ctx = qry->ctx,
-        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:%lld",
-            qry->prefix, jobid)
-    };
-    AUTO_RMKEY RedisModuleKey *job_key = RedisModule_OpenKey(qry->ctx,
-        job_keyname.str, REDISMODULE_READ);
-    if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
-        return QUERY_NULL;
-    }
-    if (RedisModule_KeyType(job_key) != REDISMODULE_KEYTYPE_HASH) {
-        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
-            REDISMODULE_ERRORMSG_WRONGTYPE);
-        return QUERY_ERR;
-    }
-
-    // Fetch data on the job key
-    AUTO_RMSTR redis_module_string_t abi = { .ctx = qry->ctx };
-    AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
-    AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
-    AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
-    if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
-        redis_field_labels[kABI], &abi.str,
-        redis_field_labels[kTimeFormat], &tmf.str,
-        redis_field_labels[kStart], &start.str,
-        redis_field_labels[kEnd], &end.str,
-        NULL) == REDISMODULE_ERR) {
-        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
-            "error fetching job data");
-        return QUERY_ERR;
-    }
-
-    long long _tmf;
-    if (RedisModule_StringToLongLong(tmf.str, &_tmf) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(qry->ctx, "invalid _tmf");
-        return QUERY_ERR;
-    }
-
-    if (_tmf == 1) {
-        const char *start_c = RedisModule_StringPtrLen(start.str, NULL);
-        const char *end_c = RedisModule_StringPtrLen(end.str, NULL);
-        if (strncmp(qry->start_time_c, start_c, ISO8601_SZ-1) > 0 ||
-                strncmp(qry->end_time_c, end_c, ISO8601_SZ-1) < 0) {
-            return QUERY_FAIL;
+    if (qry->jobs_sz) {
+        // Scan user-specified job set
+        size_t i = 0;
+        for (; i < qry->jobs_sz; ++i) {
+            if (job_query_check_job(qry, qry->jobs[i]) == QUERY_PASS) {
+                // Add job to sorted matchset
+                AUTO_RMREPLY RedisModuleCallReply *reply =
+                    RedisModule_Call(qry->ctx, "ZADD", "sll", matchset,
+                        qry->jobs[i], qry->jobs[i]);
+            }
         }
     } else {
-        long long start_time, end_time;
-        if (RedisModule_StringToLongLong(start.str, &start_time)
-            == REDISMODULE_ERR) {
-            return QUERY_FAIL;
-        }
-        if (RedisModule_StringToLongLong(end.str, &end_time)
-            == REDISMODULE_ERR) {
-            return QUERY_FAIL;
-        }
-        if (qry->start_time > start_time || qry->end_time < end_time) {
-            return QUERY_FAIL;
+        // Scan indices for jobs that match
+        int rc;
+        const char *err = NULL;
+        long long start_day = qry->start_time / SECONDS_PER_DAY;
+        long long end_day = qry->end_time / SECONDS_PER_DAY;
+        long long day;
+
+        for (day = start_day; day <= end_day; ++day) {
+
+            AUTO_RMSTR redis_module_string_t idx = {
+                .ctx = qry->ctx,
+                .str = RedisModule_CreateStringPrintf(qry->ctx,
+                    "%s:idx:end:%lld", qry->prefix, day)
+            };
+            sscan_cursor_init_t init = {
+                .ctx = qry->ctx,
+                .set = idx.str,
+                .count = 500
+            };
+            AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
+                create_sscan_cursor(&init);
+            if (sscan_error(cursor, &err, NULL) == SSCAN_ERR) {
+                qry->err = RedisModule_CreateStringPrintf(qry->ctx, err);
+                return QUERY_ERR;
+            }
+            do {
+                AUTO_RMSTR redis_module_string_t job = { .ctx = qry->ctx };
+                rc = sscan_next_element(cursor, &job.str);
+                if (rc == SSCAN_ERR) {
+                    sscan_error(cursor, &err, NULL);
+                    qry->err = RedisModule_CreateStringPrintf(qry->ctx, err);
+                    return QUERY_ERR;
+                }
+                if ((rc == SSCAN_OK) && job.str) {
+                    long long jobid;
+                    if (RedisModule_StringToLongLong(job.str, &jobid)
+                        == REDISMODULE_ERR) {
+                        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+                            "invalid job id");
+                        return QUERY_ERR;
+                    }
+                    int job_match = job_query_check_job(qry, jobid);
+                    if (job_match == QUERY_ERR) {
+                        return QUERY_ERR;
+                    }
+                    if (job_match == QUERY_PASS) {
+                        // Add job to sorted matchset
+                        AUTO_RMREPLY RedisModuleCallReply *reply =
+                            RedisModule_Call(qry->ctx, "ZADD", "sll", matchset,
+                                jobid, jobid);
+                    }
+                }
+            } while (rc != SSCAN_EOF);
         }
     }
 
-    return QUERY_PASS;
-}
-
-int job_query_start_day(const job_query_t qry, long long *start_day)
-{
-    assert(qry != NULL);
-    if (start_day) {
-        *start_day = qry->start_time / SECONDS_PER_DAY;
-    }
-    return QUERY_OK;
-}
-
-int job_query_end_day(const job_query_t qry, long long *end_day)
-{
-    assert(qry != NULL);
-    if (end_day) {
-        *end_day = qry->end_time / SECONDS_PER_DAY;
-    }
     return QUERY_OK;
 }
