@@ -41,10 +41,130 @@ typedef struct job_query {
     const char *prefix;
     const char *uuid;
     // secs since unix epoch
-    long long start_time, end_time;
+    long long start_time;
+    long long end_time;
     // iso8601 date/times w/tz "Z"
-    char start_time_c[ISO8601_SZ], end_time_c[ISO8601_SZ];
+    char start_time_c[ISO8601_SZ];
+    char end_time_c[ISO8601_SZ];
+    // set-based criteria: arrays and array sizes
+    RedisModuleString **accounts;
+    RedisModuleString **clusters;
+    RedisModuleString **gids;
+    long long *jobs;
+    RedisModuleString **jobnames;
+    RedisModuleString **partitions;
+    RedisModuleString **states;
+    RedisModuleString **uids;
+    size_t accounts_sz;
+    size_t clusters_sz;
+    size_t gids_sz;
+    size_t jobs_sz;
+    size_t jobnames_sz;
+    size_t partitions_sz;
+    size_t states_sz;
+    size_t uids_sz;
 } *job_query_t;
+
+static int add_criteria(job_query_t qry, const RedisModuleString *key,
+    RedisModuleString ***arr, size_t *len)
+{
+    assert(qry != NULL);
+    assert(key != NULL);
+    assert(arr != NULL);
+    assert(len != NULL);
+
+    if (qry->err) {
+        RedisModule_FreeString(qry->ctx, qry->err);
+        qry->err = NULL;
+    }
+
+    AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
+        "SCARD", "s", key);
+    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) {
+        return QUERY_OK;
+    }
+    if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_INTEGER) {
+        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+            REDISMODULE_ERRORMSG_WRONGTYPE);
+        return QUERY_ERR;
+    }
+    *len = RedisModule_CallReplyInteger(reply);
+    if (*len > 0) {
+        *arr = RedisModule_Calloc(*len, sizeof(RedisModuleString *));
+    }
+
+    size_t i = 0;
+    for (; i < *len; ++i) {
+        AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
+            "SPOP", "s", key);
+        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
+            qry->err = RedisModule_CreateStringFromCallReply(reply);
+            return QUERY_ERR;
+        }
+        if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_STRING) {
+            qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+                REDISMODULE_ERRORMSG_WRONGTYPE);
+            return QUERY_ERR;
+        }
+        *arr[i] = RedisModule_CreateStringFromCallReply(reply);
+    }
+
+    return QUERY_OK;
+}
+
+static int add_job_criteria(job_query_t qry, const RedisModuleString *key,
+    long long **arr, size_t *len)
+{
+    assert(qry != NULL);
+    assert(key != NULL);
+    assert(arr != NULL);
+    assert(len != NULL);
+
+    if (qry->err) {
+        RedisModule_FreeString(qry->ctx, qry->err);
+        qry->err = NULL;
+    }
+
+    AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
+        "SCARD", "s", key);
+    if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) {
+        return QUERY_OK;
+    }
+    if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_INTEGER) {
+        qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+            REDISMODULE_ERRORMSG_WRONGTYPE);
+        return QUERY_ERR;
+    }
+    *len = RedisModule_CallReplyInteger(reply);
+    if (*len > 0) {
+        *arr = RedisModule_Calloc(*len, sizeof(RedisModuleString *));
+    }
+
+    size_t i = 0;
+    for (; i < *len; ++i) {
+        AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
+            "SPOP", "s", key);
+        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
+            qry->err = RedisModule_CreateStringFromCallReply(reply);
+            return QUERY_ERR;
+        }
+        if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_STRING) {
+            qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+                REDISMODULE_ERRORMSG_WRONGTYPE);
+            return QUERY_ERR;
+        }
+        AUTO_RMSTR redis_module_string_t job = {
+            .ctx = qry->ctx,
+            .str = RedisModule_CreateStringFromCallReply(reply)
+        };
+        if (RedisModule_StringToLongLong(job.str, &*arr[i])
+            == REDISMODULE_ERR) {
+            return QUERY_ERR;
+        }
+    }
+
+    return QUERY_OK;
+}
 
 job_query_t create_job_query(const job_query_init_t *init)
 {
@@ -61,11 +181,72 @@ void destroy_job_query(job_query_t *qry)
     if (!qry) {
         return;
     }
-    if ((*qry)->err) {
-        RedisModule_FreeString((*qry)->ctx, (*qry)->err);
-        (*qry)->err = NULL;
+    job_query_t q = *qry;
+    if (q->err) {
+        RedisModule_FreeString(q->ctx, q->err);
+        q->err = NULL;
     }
-    RedisModule_Free(*qry);
+    if (q->accounts_sz) {
+        size_t i = 0;
+        for (; i < q->accounts_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->accounts[i]);
+        }
+        RedisModule_Free(q->accounts);
+        q->accounts = NULL;
+    }
+    if (q->clusters_sz) {
+        size_t i = 0;
+        for (; i < q->clusters_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->clusters[i]);
+        }
+        RedisModule_Free(q->clusters);
+        q->clusters = NULL;
+    }
+    if (q->gids_sz) {
+        size_t i = 0;
+        for (; i < q->gids_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->gids[i]);
+        }
+        RedisModule_Free(q->gids);
+        q->gids = NULL;
+    }
+    if (q->jobs_sz) {
+        RedisModule_Free(q->jobs);
+        q->jobs = NULL;
+    }
+    if (q->jobnames_sz) {
+        size_t i = 0;
+        for (; i < q->jobnames_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->jobnames[i]);
+        }
+        RedisModule_Free(q->jobnames);
+        q->jobnames = NULL;
+    }
+    if (q->partitions_sz) {
+        size_t i = 0;
+        for (; i < q->partitions_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->partitions[i]);
+        }
+        RedisModule_Free(q->partitions);
+        q->partitions = NULL;
+    }
+    if (q->states_sz) {
+        size_t i = 0;
+        for (; i < q->states_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->states[i]);
+        }
+        RedisModule_Free(q->states);
+        q->states = NULL;
+    }
+    if (q->uids_sz) {
+        size_t i = 0;
+        for (; i < q->uids_sz; ++i) {
+            RedisModule_FreeString(q->ctx, q->uids[i]);
+        }
+        RedisModule_Free(q->uids);
+        q->uids = NULL;
+    }
+    RedisModule_Free(q);
     *qry = NULL;
 }
 
@@ -73,7 +254,7 @@ int job_query_prepare(job_query_t qry)
 {
     assert(qry != NULL);
 
-    // Open the query key
+    // Open query key
     AUTO_RMSTR redis_module_string_t query_keyname = {
         .ctx = qry->ctx,
         .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s",
@@ -90,7 +271,7 @@ int job_query_prepare(job_query_t qry)
         return QUERY_ERR;
     }
 
-    // Fetch criteria on the query key
+    // Fetch scalar criteria
     AUTO_RMSTR redis_module_string_t abi = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
@@ -147,6 +328,66 @@ int job_query_prepare(job_query_t qry)
     qry->start_time = start_time;
     qry->end_time = end_time;
 
+    // Fetch set-based critiera
+    AUTO_RMSTR redis_module_string_t account_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:act",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t cluster_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:cls",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t gid_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:gid",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t job_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:job",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t jobname_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:jnm",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t partition_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:prt",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t state_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:stt",
+            qry->prefix, qry->uuid)
+    };
+    AUTO_RMSTR redis_module_string_t uid_key = {
+        .ctx = qry->ctx,
+        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:uid",
+            qry->prefix, qry->uuid)
+    };
+    if ((add_criteria(qry, account_key.str, &qry->accounts, &qry->accounts_sz)
+            == QUERY_ERR) ||
+        (add_criteria(qry, cluster_key.str, &qry->clusters, &qry->clusters_sz)
+            == QUERY_ERR) ||
+        (add_criteria(qry, gid_key.str, &qry->gids, &qry->gids_sz)
+            == QUERY_ERR) ||
+        (add_job_criteria(qry, gid_key.str, &qry->jobs, &qry->jobs_sz)
+            == QUERY_ERR) ||
+        (add_criteria(qry, jobname_key.str, &qry->jobnames, &qry->jobnames_sz)
+            == QUERY_ERR) ||
+        (add_criteria(qry, partition_key.str, &qry->partitions,
+            &qry->partitions_sz) == QUERY_ERR) ||
+        (add_criteria(qry, state_key.str, &qry->states, &qry->states_sz)
+            == QUERY_ERR) ||
+        (add_criteria(qry, uid_key.str, &qry->uids, &qry->uids_sz)
+            == QUERY_ERR)) {
+        return QUERY_ERR;
+    }
+
     return QUERY_OK;
 }
 
@@ -164,6 +405,11 @@ int job_query_match_job(const job_query_t qry, long long jobid)
 {
     assert(qry != NULL);
     assert(jobid > 0);
+
+    if (qry->err) {
+        RedisModule_FreeString(qry->ctx, qry->err);
+        qry->err = NULL;
+    }
 
     // Open the job key
     AUTO_RMSTR redis_module_string_t job_keyname = {

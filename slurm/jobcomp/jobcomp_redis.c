@@ -343,60 +343,59 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         pipeline += 2;
     }
 
-    // Create redis set for account_list
+    // Create redis set for account list
     if ((job_cond->acct_list) && list_count(job_cond->acct_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:acc", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->acct_list);
     }
 
-    // Create redis set for cluster_list
+    // Create redis set for cluster list
     if ((job_cond->cluster_list) && list_count(job_cond->cluster_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:cls", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->cluster_list);
     }
 
-    // Create redis set for userid_list
-    if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
-        memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", prefix, uuid_s);
-        pipeline += redis_add_job_criteria(key, job_cond->userid_list);
-    }
-
-    // Create redis set for groupid_list
+    // Create redis set for gid list
     if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->groupid_list);
     }
 
-    // Create redis set for jobname_list
+    // Create redis set for job list
+    if ((job_cond->step_list) && list_count(job_cond->step_list)) {
+        memset(key, 0, sizeof(key));
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:job", prefix, uuid_s);
+        pipeline += redis_add_job_steps(key, job_cond->step_list);
+    }
+    // Create redis set for jobname list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:jnm", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->jobname_list);
     }
 
-    // Create redis set for partition_list
+    // Create redis set for partition list
     if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:prt", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
-    // Create redis set for state_list
+    // Create redis set for state list
     if ((job_cond->state_list) && list_count(job_cond->state_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:stt", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->state_list);
     }
 
-    // Create redis set for step_list
-    if ((job_cond->step_list) && list_count(job_cond->step_list)) {
+    // Create redis set for uid list
+    if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:stp", prefix, uuid_s);
-        pipeline += redis_add_job_steps(key, job_cond->step_list);
+        snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", prefix, uuid_s);
+        pipeline += redis_add_job_criteria(key, job_cond->userid_list);
     }
 
     // Pop the pipeline replies
