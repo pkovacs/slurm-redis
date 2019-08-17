@@ -182,29 +182,27 @@ void destroy_job_query(job_query_t *qry)
         return;
     }
     job_query_t q = *qry;
+    size_t i = 0;
     if (q->err) {
         RedisModule_FreeString(q->ctx, q->err);
         q->err = NULL;
     }
     if (q->accounts_sz) {
-        size_t i = 0;
-        for (; i < q->accounts_sz; ++i) {
+        for (i = 0; i < q->accounts_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->accounts[i]);
         }
         RedisModule_Free(q->accounts);
         q->accounts = NULL;
     }
     if (q->clusters_sz) {
-        size_t i = 0;
-        for (; i < q->clusters_sz; ++i) {
+        for (i = 0; i < q->clusters_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->clusters[i]);
         }
         RedisModule_Free(q->clusters);
         q->clusters = NULL;
     }
     if (q->gids_sz) {
-        size_t i = 0;
-        for (; i < q->gids_sz; ++i) {
+        for (i = 0; i < q->gids_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->gids[i]);
         }
         RedisModule_Free(q->gids);
@@ -215,32 +213,28 @@ void destroy_job_query(job_query_t *qry)
         q->jobs = NULL;
     }
     if (q->jobnames_sz) {
-        size_t i = 0;
-        for (; i < q->jobnames_sz; ++i) {
+        for (i = 0; i < q->jobnames_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->jobnames[i]);
         }
         RedisModule_Free(q->jobnames);
         q->jobnames = NULL;
     }
     if (q->partitions_sz) {
-        size_t i = 0;
-        for (; i < q->partitions_sz; ++i) {
+        for (i = 0; i < q->partitions_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->partitions[i]);
         }
         RedisModule_Free(q->partitions);
         q->partitions = NULL;
     }
     if (q->states_sz) {
-        size_t i = 0;
-        for (; i < q->states_sz; ++i) {
+        for (i = 0; i < q->states_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->states[i]);
         }
         RedisModule_Free(q->states);
         q->states = NULL;
     }
     if (q->uids_sz) {
-        size_t i = 0;
-        for (; i < q->uids_sz; ++i) {
+        for (i = 0; i < q->uids_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->uids[i]);
         }
         RedisModule_Free(q->uids);
