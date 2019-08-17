@@ -48,16 +48,12 @@ typedef struct job_query {
     char start_time_c[ISO8601_SZ];
     char end_time_c[ISO8601_SZ];
     // arrays for set-based criteria
-    RedisModuleString **accounts;
-    RedisModuleString **clusters;
     RedisModuleString **gids;
     long long *jobs;
     RedisModuleString **jobnames;
     RedisModuleString **partitions;
     RedisModuleString **states;
     RedisModuleString **uids;
-    size_t accounts_sz;
-    size_t clusters_sz;
     size_t gids_sz;
     size_t jobs_sz;
     size_t jobnames_sz;
@@ -199,11 +195,21 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t gid = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t jobname = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t partition = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t state = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t uid = { .ctx = qry->ctx };
     if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
         redis_field_labels[kABI], &abi.str,
         redis_field_labels[kTimeFormat], &tmf.str,
         redis_field_labels[kStart], &start.str,
         redis_field_labels[kEnd], &end.str,
+        redis_field_labels[kGID], &gid.str,
+        redis_field_labels[kJobName], &jobname.str,
+        redis_field_labels[kPartition], &partition.str,
+        redis_field_labels[kState], &state.str,
+        redis_field_labels[kUID], &uid.str,
         NULL) == REDISMODULE_ERR) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "error fetching job data");
@@ -238,7 +244,79 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         }
     }
 
-    return QUERY_PASS;
+    size_t i = 0;
+    int match = QUERY_PASS;
+
+    // Check gid if specified
+    if (qry->gids_sz) {
+        match = QUERY_FAIL;
+        if (gid.str) {
+            for (i = 0; i < qry->gids_sz; ++i) {
+                if (strcmp(RedisModule_StringPtrLen(qry->gids[i], NULL),
+                        RedisModule_StringPtrLen(gid.str, NULL)) == 0 ) {
+                    match = QUERY_PASS;
+                    break;
+                }
+            }
+        }
+    }
+    if (match == QUERY_FAIL) {
+        return match;
+    }
+
+    // Check jobname if specified
+    if (qry->jobnames_sz) {
+        match = QUERY_FAIL;
+        if (jobname.str) {
+            for (i = 0; i < qry->jobnames_sz; ++i) {
+                if (strcmp(RedisModule_StringPtrLen(qry->jobnames[i], NULL),
+                        RedisModule_StringPtrLen(jobname.str, NULL)) == 0 ) {
+                    match = QUERY_PASS;
+                    break;
+                }
+            }
+        }
+    }
+    if (match == QUERY_FAIL) {
+        return match;
+    }
+
+    // Check partition if specified
+    if (qry->partitions_sz) {
+        match = QUERY_FAIL;
+        if (partition.str) {
+            for (i = 0; i < qry->partitions_sz; ++i) {
+                if (strcmp(RedisModule_StringPtrLen(qry->partitions[i], NULL),
+                        RedisModule_StringPtrLen(partition.str, NULL)) == 0 ) {
+                    match = QUERY_PASS;
+                    break;
+                }
+            }
+        }
+    }
+    if (match == QUERY_FAIL) {
+        return match;
+    }
+
+    // Check job state if specified
+    if (qry->states_sz) {
+        // TODO
+    }
+
+    // Check uid if specified
+    if (qry->uids_sz) {
+        match = QUERY_FAIL;
+        if (uid.str) {
+            for (i = 0; i < qry->uids_sz; ++i) {
+                if (strcmp(RedisModule_StringPtrLen(qry->uids[i], NULL),
+                        RedisModule_StringPtrLen(uid.str, NULL)) == 0 ) {
+                    match = QUERY_PASS;
+                    break;
+                }
+            }
+        }
+    }
+    return match;
 }
 
 job_query_t create_job_query(const job_query_init_t *init)
@@ -261,20 +339,6 @@ void destroy_job_query(job_query_t *qry)
     if (q->err) {
         RedisModule_FreeString(q->ctx, q->err);
         q->err = NULL;
-    }
-    if (q->accounts_sz) {
-        for (i = 0; i < q->accounts_sz; ++i) {
-            RedisModule_FreeString(q->ctx, q->accounts[i]);
-        }
-        RedisModule_Free(q->accounts);
-        q->accounts = NULL;
-    }
-    if (q->clusters_sz) {
-        for (i = 0; i < q->clusters_sz; ++i) {
-            RedisModule_FreeString(q->ctx, q->clusters[i]);
-        }
-        RedisModule_Free(q->clusters);
-        q->clusters = NULL;
     }
     if (q->gids_sz) {
         for (i = 0; i < q->gids_sz; ++i) {
@@ -398,16 +462,6 @@ int job_query_prepare(job_query_t qry)
     qry->end_time = end_time;
 
     // Fetch set-based critiera
-    AUTO_RMSTR redis_module_string_t account_key = {
-        .ctx = qry->ctx,
-        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:act",
-            qry->prefix, qry->uuid)
-    };
-    AUTO_RMSTR redis_module_string_t cluster_key = {
-        .ctx = qry->ctx,
-        .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:cls",
-            qry->prefix, qry->uuid)
-    };
     AUTO_RMSTR redis_module_string_t gid_key = {
         .ctx = qry->ctx,
         .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:gid",
@@ -438,11 +492,7 @@ int job_query_prepare(job_query_t qry)
         .str = RedisModule_CreateStringPrintf(qry->ctx, "%s:qry:%s:uid",
             qry->prefix, qry->uuid)
     };
-    if ((add_criteria(qry, account_key.str, &qry->accounts, &qry->accounts_sz)
-            == QUERY_ERR) ||
-        (add_criteria(qry, cluster_key.str, &qry->clusters, &qry->clusters_sz)
-            == QUERY_ERR) ||
-        (add_criteria(qry, gid_key.str, &qry->gids, &qry->gids_sz)
+    if ((add_criteria(qry, gid_key.str, &qry->gids, &qry->gids_sz)
             == QUERY_ERR) ||
         (add_job_criteria(qry, job_key.str, &qry->jobs, &qry->jobs_sz)
             == QUERY_ERR) ||

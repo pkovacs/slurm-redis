@@ -270,9 +270,9 @@ int slurm_jobcomp_log_record(struct job_record *job)
 
 #if 0
 typedef struct {
- *  List acct_list;     /* list of char * */
-    List associd_list;  /* list of char */
- *  List cluster_list;  /* list of char * */ /* sacct: requires cluster in accounting or will reject */
+ -  List acct_list;     /* list of char * */ /* requires accounting */
+ -  List associd_list;  /* list of char */   /* requires accounting */
+ -  List cluster_list;  /* list of char * */ /* requires accounting */
     uint32_t cpus_max;  /* number of cpus high range */
     uint32_t cpus_min;  /* number of cpus low range */
     int32_t exitcode;   /* exit code of job */
@@ -283,7 +283,7 @@ typedef struct {
     uint32_t nodes_max; /* number of nodes high range */
     uint32_t nodes_min; /* number of nodes low range */
  *  List partition_list;/* list of char * */
- -  List qos_list;      /* list of char * */  /* sacct: requires qos in accounting or will reject */
+ -  List qos_list;      /* list of char * */  /* requires accounting */
  -  List resv_list;     /* list of char * */  /* sacct: not supported as an input option */
  -  List resvid_list;   /* list of char * */  /* sacct: not supported as an input option */
  *  List state_list;    /* list of char * */
@@ -341,20 +341,6 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
             QUERY_TTL);
         pipeline += 2;
-    }
-
-    // Create redis set for account list
-    if ((job_cond->acct_list) && list_count(job_cond->acct_list)) {
-        memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:acc", prefix, uuid_s);
-        pipeline += redis_add_job_criteria(key, job_cond->acct_list);
-    }
-
-    // Create redis set for cluster list
-    if ((job_cond->cluster_list) && list_count(job_cond->cluster_list)) {
-        memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key)-1, "%s:qry:%s:cls", prefix, uuid_s);
-        pipeline += redis_add_job_criteria(key, job_cond->cluster_list);
     }
 
     // Create redis set for gid list
