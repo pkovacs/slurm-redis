@@ -243,8 +243,8 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             break;
         }
         size_t s = 0;
-        for (; (s < RedisModule_CallReplyLength(reply)) &&
-                (count < max_count); s += 2) {
+        for (; (s < RedisModule_CallReplyLength(reply)) && (count < max_count);
+            s += 2) {
             RedisModuleCallReply *subreply = // no AUTO_RMREPLY
                 RedisModule_CallReplyArrayElement(reply, s);
             AUTO_RMSTR redis_module_string_t job = {
