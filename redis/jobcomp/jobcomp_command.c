@@ -235,8 +235,6 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
     count = 0;
     while (count < max_count) {
-        size_t s = 0;
-        AUTO_RMFIELDS redis_module_fields_t fields = { .ctx = ctx };
         AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(ctx,
             "ZPOPMIN", "sl", matchset.str, 100);
         if ((RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) ||
@@ -244,7 +242,8 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             (RedisModule_CallReplyLength(reply)) == 0) {
             break;
         }
-        for (s = 0; (s < RedisModule_CallReplyLength(reply)) &&
+        size_t s = 0;
+        for (; (s < RedisModule_CallReplyLength(reply)) &&
                 (count < max_count); s += 2) {
             RedisModuleCallReply *subreply = // no AUTO_RMREPLY
                 RedisModule_CallReplyArrayElement(reply, s);
@@ -267,6 +266,7 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
             if (RedisModule_KeyType(job_key) == REDISMODULE_KEYTYPE_EMPTY) {
                 continue;
             }
+            AUTO_RMFIELDS redis_module_fields_t fields = { .ctx = ctx };
             if (RedisModule_HashGet(job_key, REDISMODULE_HASH_CFIELDS,
                 redis_field_labels[0], &fields.str[0],
                 redis_field_labels[1], &fields.str[1],

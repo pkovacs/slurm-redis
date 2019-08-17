@@ -356,6 +356,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
         snprintf(key, sizeof(key)-1, "%s:qry:%s:job", prefix, uuid_s);
         pipeline += redis_add_job_steps(key, job_cond->step_list);
     }
+
     // Create redis set for jobname list
     if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
