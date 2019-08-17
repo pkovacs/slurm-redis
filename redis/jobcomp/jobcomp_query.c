@@ -103,7 +103,7 @@ static int add_criteria(job_query_t qry, const RedisModuleString *key,
                 REDISMODULE_ERRORMSG_WRONGTYPE);
             return QUERY_ERR;
         }
-        *arr[i] = RedisModule_CreateStringFromCallReply(reply);
+        (*arr)[i] = RedisModule_CreateStringFromCallReply(reply);
     }
 
     return QUERY_OK;
@@ -222,6 +222,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         return QUERY_ERR;
     }
 
+    // Check job time
     if (_tmf == 1) {
         const char *start_c = RedisModule_StringPtrLen(start.str, NULL);
         const char *end_c = RedisModule_StringPtrLen(end.str, NULL);
@@ -300,7 +301,19 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
 
     // Check job state if specified
     if (qry->states_sz) {
-        // TODO
+        match = QUERY_FAIL;
+        if (state.str) {
+            for (i = 0; i < qry->states_sz; ++i) {
+                if (strcmp(RedisModule_StringPtrLen(qry->states[i], NULL),
+                        RedisModule_StringPtrLen(state.str, NULL)) == 0 ) {
+                    match = QUERY_PASS;
+                    break;
+                }
+            }
+        }
+    }
+    if (match == QUERY_FAIL) {
+        return match;
     }
 
     // Check uid if specified
