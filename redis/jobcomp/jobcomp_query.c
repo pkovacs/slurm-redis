@@ -76,34 +76,30 @@ static int add_criteria(job_query_t qry, const RedisModuleString *key,
     }
 
     AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
-        "SCARD", "s", key);
+        "SMEMBERS", "s", key);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) {
         return QUERY_OK;
     }
-    if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_INTEGER) {
+    if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_ARRAY) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             REDISMODULE_ERRORMSG_WRONGTYPE);
         return QUERY_ERR;
     }
-    *len = RedisModule_CallReplyInteger(reply);
+    *len = RedisModule_CallReplyLength(reply);
     if (*len > 0) {
         *arr = RedisModule_Calloc(*len, sizeof(RedisModuleString *));
     }
 
     size_t i = 0;
     for (; i < *len; ++i) {
-        AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
-            "SPOP", "s", key);
-        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
-            qry->err = RedisModule_CreateStringFromCallReply(reply);
-            return QUERY_ERR;
-        }
-        if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_STRING) {
+        RedisModuleCallReply *subreply =
+            RedisModule_CallReplyArrayElement(reply, i); // no AUTO_RMREPLY
+        if (RedisModule_CallReplyType(subreply) != REDISMODULE_REPLY_STRING) {
             qry->err = RedisModule_CreateStringPrintf(qry->ctx,
                 REDISMODULE_ERRORMSG_WRONGTYPE);
             return QUERY_ERR;
         }
-        (*arr)[i] = RedisModule_CreateStringFromCallReply(reply);
+        (*arr)[i] = RedisModule_CreateStringFromCallReply(subreply);
     }
 
     return QUERY_OK;
@@ -123,36 +119,32 @@ static int add_job_criteria(job_query_t qry, const RedisModuleString *key,
     }
 
     AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
-        "SCARD", "s", key);
+        "SMEMBERS", "s", key);
     if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) {
         return QUERY_OK;
     }
-    if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_INTEGER) {
+    if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_ARRAY) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             REDISMODULE_ERRORMSG_WRONGTYPE);
         return QUERY_ERR;
     }
-    *len = RedisModule_CallReplyInteger(reply);
+    *len = RedisModule_CallReplyLength(reply);
     if (*len > 0) {
         *arr = RedisModule_Calloc(*len, sizeof(long long));
     }
 
     size_t i = 0;
     for (; i < *len; ++i) {
-        AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(qry->ctx,
-            "SPOP", "s", key);
-        if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
-            qry->err = RedisModule_CreateStringFromCallReply(reply);
-            return QUERY_ERR;
-        }
-        if (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_STRING) {
+        RedisModuleCallReply *subreply =
+            RedisModule_CallReplyArrayElement(reply, i); // no AUTO_RMREPLY
+        if (RedisModule_CallReplyType(subreply) != REDISMODULE_REPLY_STRING) {
             qry->err = RedisModule_CreateStringPrintf(qry->ctx,
                 REDISMODULE_ERRORMSG_WRONGTYPE);
             return QUERY_ERR;
         }
         AUTO_RMSTR redis_module_string_t job = {
             .ctx = qry->ctx,
-            .str = RedisModule_CreateStringFromCallReply(reply)
+            .str = RedisModule_CreateStringFromCallReply(subreply)
         };
         if (RedisModule_StringToLongLong(job.str, (*arr)+i)
             == REDISMODULE_ERR) {
@@ -353,6 +345,7 @@ void destroy_job_query(job_query_t *qry)
         RedisModule_FreeString(q->ctx, q->err);
         q->err = NULL;
     }
+
     if (q->gids_sz) {
         for (i = 0; i < q->gids_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->gids[i]);
