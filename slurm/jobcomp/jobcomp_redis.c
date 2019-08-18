@@ -292,16 +292,19 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 
     // Create redis hash set for the job criteria
     {
+        slurm_debug("nnodes_min = %u max = %u", job_cond->nodes_min, job_cond->nodes_max);
         AUTO_STR char *start = jobcomp_redis_format_time(_tmf,
             job_cond->usage_start);
         AUTO_STR char *end = jobcomp_redis_format_time(_tmf,
             job_cond->usage_end);
         redisAppendCommand(ctx, "HSET %s:qry:%s %s %u %s %u "
-            "%s %s %s %s", prefix, uuid_s,
+            "%s %s %s %s %sMin %u %sMax %u", prefix, uuid_s,
             redis_field_labels[kABI], SLURM_REDIS_ABI,
             redis_field_labels[kTimeFormat], _tmf,
             redis_field_labels[kStart], start,
-            redis_field_labels[kEnd], end);
+            redis_field_labels[kEnd], end,
+            redis_field_labels[kNNodes], job_cond->nodes_min,
+            redis_field_labels[kNNodes], job_cond->nodes_max);
         redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
             QUERY_TTL);
         pipeline += 2;

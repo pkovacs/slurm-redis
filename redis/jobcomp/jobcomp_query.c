@@ -47,6 +47,9 @@ typedef struct job_query {
     // iso8601 date/times w/tz "Z"
     char start_time_c[ISO8601_SZ];
     char end_time_c[ISO8601_SZ];
+    // nnodes range
+    long long nnodes_min;
+    long long nnodes_max;
     // arrays for set-based criteria
     RedisModuleString **gids;
     long long *jobs;
@@ -160,6 +163,9 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
     assert(qry != NULL);
     assert(jobid > 0);
 
+    size_t i = 0;
+    int match = QUERY_PASS;
+
     if (qry->err) {
         RedisModule_FreeString(qry->ctx, qry->err);
         qry->err = NULL;
@@ -188,6 +194,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
     AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t gid = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t nnodes = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t jobname = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t partition = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t state = { .ctx = qry->ctx };
@@ -198,6 +205,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         redis_field_labels[kStart], &start.str,
         redis_field_labels[kEnd], &end.str,
         redis_field_labels[kGID], &gid.str,
+        redis_field_labels[kNNodes], &nnodes.str,
         redis_field_labels[kJobName], &jobname.str,
         redis_field_labels[kPartition], &partition.str,
         redis_field_labels[kState], &state.str,
@@ -220,25 +228,27 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         const char *end_c = RedisModule_StringPtrLen(end.str, NULL);
         if (strncmp(qry->start_time_c, start_c, ISO8601_SZ-1) > 0 ||
                 strncmp(qry->end_time_c, end_c, ISO8601_SZ-1) < 0) {
-            return QUERY_FAIL;
+            match = QUERY_FAIL;
         }
-    } else {
+    } else do {
         long long start_time, end_time;
         if (RedisModule_StringToLongLong(start.str, &start_time)
             == REDISMODULE_ERR) {
-            return QUERY_FAIL;
+            match = QUERY_FAIL;
+            break;
         }
         if (RedisModule_StringToLongLong(end.str, &end_time)
             == REDISMODULE_ERR) {
-            return QUERY_FAIL;
+            match = QUERY_FAIL;
+            break;
         }
         if (qry->start_time > start_time || qry->end_time < end_time) {
-            return QUERY_FAIL;
+            match = QUERY_FAIL;
         }
+    } while (0);
+    if (match == QUERY_FAIL) {
+        return match;
     }
-
-    size_t i = 0;
-    int match = QUERY_PASS;
 
     // Check gid
     if (qry->gids_sz) {
@@ -249,6 +259,26 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
                         RedisModule_StringPtrLen(gid.str, NULL)) == 0 ) {
                     match = QUERY_PASS;
                     break;
+                }
+            }
+        }
+    }
+    if (match == QUERY_FAIL) {
+        return match;
+    }
+
+    // Check nnodes_min/max
+    if ((qry->nnodes_min > 0) || (qry->nnodes_max > 0)) {
+        match = QUERY_FAIL;
+        if (nnodes.str) {
+            long long nds;
+            if (RedisModule_StringToLongLong(nnodes.str, &nds)
+                == REDISMODULE_OK) {
+                if (qry->nnodes_min <= nds) {
+                    match = QUERY_PASS;
+                }
+                if ((qry->nnodes_max > 0) && (nds > qry->nnodes_max)) {
+                    match = QUERY_FAIL;
                 }
             }
         }
@@ -414,11 +444,21 @@ int job_query_prepare(job_query_t qry)
     AUTO_RMSTR redis_module_string_t tmf = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t start = { .ctx = qry->ctx };
     AUTO_RMSTR redis_module_string_t end = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t nnodes_min = { .ctx = qry->ctx };
+    AUTO_RMSTR redis_module_string_t nnodes_max = { .ctx = qry->ctx };
+    char nnodes_min_label[16] = {0};
+    char nnodes_max_label[16] = {0};
+    snprintf(nnodes_min_label, sizeof(nnodes_min_label)-1, "%sMin",
+        redis_field_labels[kNNodes]);
+    snprintf(nnodes_max_label, sizeof(nnodes_min_label)-1, "%sMax",
+        redis_field_labels[kNNodes]);
     if (RedisModule_HashGet(query_key, REDISMODULE_HASH_CFIELDS,
         redis_field_labels[kABI], &abi.str,
         redis_field_labels[kTimeFormat], &tmf.str,
         redis_field_labels[kStart], &start.str,
         redis_field_labels[kEnd], &end.str,
+        nnodes_min_label, &nnodes_min.str,
+        nnodes_max_label, &nnodes_max.str,
         NULL) == REDISMODULE_ERR) {
         qry->err = RedisModule_CreateStringPrintf(qry->ctx,
             "error fetching query data");
@@ -465,6 +505,24 @@ int job_query_prepare(job_query_t qry)
     }
     qry->start_time = start_time;
     qry->end_time = end_time;
+
+    if (nnodes_min.str) {
+        if (RedisModule_StringToLongLong(nnodes_min.str, &qry->nnodes_min)
+            == REDISMODULE_ERR) {
+            qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+                "invalid nnodes min value");
+            return QUERY_ERR;
+        }
+    }
+
+    if (nnodes_max.str) {
+        if (RedisModule_StringToLongLong(nnodes_max.str, &qry->nnodes_max)
+            == REDISMODULE_ERR) {
+            qry->err = RedisModule_CreateStringPrintf(qry->ctx,
+                "invalid nnodes max value");
+            return QUERY_ERR;
+        }
+    }
 
     // Fetch set-based critiera
     AUTO_RMSTR redis_module_string_t gid_key = {
