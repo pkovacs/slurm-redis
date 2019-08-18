@@ -70,15 +70,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-if(NOT SLURM_SOURCE_DIR)
-    message(FATAL_ERROR "SLURM_SOURCE_DIR not set")
-endif()
-
-if(NOT EXISTS ${SLURM_SOURCE_DIR})
-    message(FATAL_ERROR "Slurm source dir (${SLURM_SOURCE_DIR}) not found")
-endif()
-message(STATUS "Found Slurm source dir at ${SLURM_SOURCE_DIR}")
-
 option(ISO8601_DATES "Store ISO8601 dates in redis" ON)
 
 if(NOT ID_CACHE_SIZE)
@@ -145,4 +136,6 @@ string(CONCAT CPACK_PACKAGE_VERSION
     "${SLURM_REDIS_VERSION_MINOR}."
     "${SLURM_REDIS_VERSION_PATCH}")
 set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION})
+set(CPACK_SOURCE_GENERATOR "TBZ2")
+set(CPACK_SOURCE_IGNORE_FILES "/build/;/.git*;/TODO;${CPACK_SOURCE_IGNORE_FILES}")
 include(CPack)

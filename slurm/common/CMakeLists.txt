@@ -34,5 +34,5 @@ set_target_properties(slurm_common
 )
 
 target_include_directories(slurm_common
-    PRIVATE ${SLURM_SOURCE_DIR}
+    PRIVATE ${SLURM_INCLUDE_DIR}
 )

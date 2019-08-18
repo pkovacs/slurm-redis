@@ -29,8 +29,8 @@
 include(FindPackageHandleStandardArgs)
 
 find_path(SLURM_INCLUDE_DIR
-    NAMES slurm.h
-    PATH_SUFFIXES slurm
+    NAMES slurm/slurm.h
+    NO_CMAKE_SYSTEM_PATH
 )
 
 find_library(SLURM_LIBRARY
