@@ -24,6 +24,11 @@
 
 include(CheckFunctionExists)
 
+check_function_exists("difftime" HAVE_DIFFTIME)
+if(NOT HAVE_DIFFTIME)
+    message(FATAL_ERROR "difftime not found")
+endif()
+
 check_function_exists("gmtime_r" HAVE_GMTIME_R)
 if(NOT HAVE_GMTIME_R)
     message(FATAL_ERROR "gmtime_r not found")
