@@ -345,7 +345,6 @@ void destroy_job_query(job_query_t *qry)
         RedisModule_FreeString(q->ctx, q->err);
         q->err = NULL;
     }
-
     if (q->gids_sz) {
         for (i = 0; i < q->gids_sz; ++i) {
             RedisModule_FreeString(q->ctx, q->gids[i]);
