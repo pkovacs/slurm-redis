@@ -292,7 +292,6 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 
     // Create redis hash set for the job criteria
     {
-        slurm_debug("nnodes_min = %u max = %u", job_cond->nodes_min, job_cond->nodes_max);
         AUTO_STR char *start = jobcomp_redis_format_time(_tmf,
             job_cond->usage_start);
         AUTO_STR char *end = jobcomp_redis_format_time(_tmf,
