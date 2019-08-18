@@ -263,37 +263,6 @@ int slurm_jobcomp_log_record(struct job_record *job)
     return SLURM_SUCCESS;
 }
 
-#if 0
-typedef struct {
- -  List acct_list;     /* list of char * */ /* requires accounting */
- -  List associd_list;  /* list of char */   /* requires accounting */
- -  List cluster_list;  /* list of char * */ /* requires accounting */
-    uint32_t cpus_max;  /* number of cpus high range */
-    uint32_t cpus_min;  /* number of cpus low range */
-    int32_t exitcode;   /* exit code of job */
-    uint32_t flags;     /* Reporting flags*/
-    List format_list;   /* list of char * */
- *  List groupid_list;  /* list of char * */
- *  List jobname_list;  /* list of char * */
-    uint32_t nodes_max; /* number of nodes high range */
-    uint32_t nodes_min; /* number of nodes low range */
- *  List partition_list;/* list of char * */
- -  List qos_list;      /* list of char * */  /* requires accounting */
- -  List resv_list;     /* list of char * */  /* sacct: not supported as an input option */
- -  List resvid_list;   /* list of char * */  /* sacct: not supported as an input option */
- *  List state_list;    /* list of char * */
- *  List step_list;     /* list of slurmdb_selected_step_t */
-    uint32_t timelimit_max; /* max timelimit */
-    uint32_t timelimit_min; /* min timelimit */
- *  time_t usage_end;
- *  time_t usage_start;
-    char *used_nodes;   /* a ranged node string where jobs ran */
- *  List userid_list;   /* list of char * */
-    List wckey_list;    /* list of char * */
-} slurmdb_job_cond_t;
-#endif
-
-
 List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 {
     if (!job_cond) {
