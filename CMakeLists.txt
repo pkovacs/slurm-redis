@@ -70,7 +70,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(ISO8601_DATES "Store ISO8601 dates in redis" ON)
+option(USE_ISO8601 "Use ISO8601 date/time format in redis" ON)
 
 if(NOT ID_CACHE_SIZE)
     set(ID_CACHE_SIZE "128")

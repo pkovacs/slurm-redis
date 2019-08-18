@@ -46,7 +46,7 @@ const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
 const uint32_t plugin_version = SLURM_VERSION_NUMBER;
 
-#ifdef ISO8601_DATES
+#ifdef USE_ISO8601
 const unsigned int _tmf = 1;
 #else
 const unsigned int _tmf = 0;
