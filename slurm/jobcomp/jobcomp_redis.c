@@ -42,11 +42,6 @@
 #include "jobcomp_redis_auto.h"
 #include "jobcomp_redis_format.h"
 
-#define USER_CACHE_SZ 64
-#define GROUP_CACHE_SZ 64
-#define USER_CACHE_TTL 120
-#define GROUP_CACHE_TTL 120
-
 const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
 const uint32_t plugin_version = SLURM_VERSION_NUMBER;
@@ -152,10 +147,10 @@ int init(void)
         pass = slurm_get_jobcomp_pass();
     }
     jobcomp_redis_format_init_t format_init = {
-        .user_cache_sz = USER_CACHE_SZ,
-        .user_cache_ttl = USER_CACHE_TTL,
-        .group_cache_sz = GROUP_CACHE_SZ,
-        .group_cache_ttl = GROUP_CACHE_TTL
+        .user_cache_sz = ID_CACHE_SIZE,
+        .user_cache_ttl = ID_CACHE_TTL,
+        .group_cache_sz = ID_CACHE_SIZE,
+        .group_cache_ttl = ID_CACHE_TTL
     };
     jobcomp_redis_format_init(&format_init);
     return SLURM_SUCCESS;
@@ -430,7 +425,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     do {
         redis_fields_t fields; // do not AUTO_FIELDS
         AUTO_REPLY redisReply *reply = redisCommand(ctx,
-            "SLURMJC.FETCH %s %s 500", prefix, uuid_s);
+            "SLURMJC.FETCH %s %s %u", prefix, uuid_s, FETCH_COUNT);
         if (!reply || (reply->type == REDIS_REPLY_NIL) ||
             (reply->type != REDIS_REPLY_ARRAY) ||
             (reply->elements == 0)) {

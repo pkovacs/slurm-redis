@@ -34,6 +34,6 @@ find_path(REDIS_INCLUDE_DIR
 find_package_handle_standard_args(
     REDIS REQUIRED_VARS REDIS_INCLUDE_DIR)
 
-if (REDIS_FOUND)
+if(REDIS_FOUND)
     set(REDIS_INCLUDE_DIRS ${REDIS_INCLUDE_DIR})
 endif()

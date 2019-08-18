@@ -37,8 +37,6 @@
 #include "jobcomp_auto.h"
 #include "jobcomp_query.h"
 
-#define FETCH_MAX_COUNT 500
-
 /*
  * SLURMJC.INDEX <prefix> <jobid>
  */
@@ -228,15 +226,15 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithError(ctx, "invalid max count");
         return REDISMODULE_ERR;
     }
-    if (max_count > FETCH_MAX_COUNT) {
-        max_count = FETCH_MAX_COUNT;
+    if (max_count > FETCH_LIMIT) {
+        max_count = FETCH_LIMIT;
     }
     RedisModule_ReplyWithArray(ctx, REDISMODULE_POSTPONED_ARRAY_LEN);
 
     count = 0;
     while (count < max_count) {
         AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(ctx,
-            "ZPOPMIN", "sl", matchset.str, 100);
+            "ZPOPMIN", "sl", matchset.str, FETCH_COUNT);
         if ((RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) ||
             (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_ARRAY) ||
             (RedisModule_CallReplyLength(reply)) == 0) {

@@ -30,7 +30,8 @@
 #define SLURM_REDIS_VERSION_PATCH @SLURM_REDIS_VERSION_PATCH@
 #define SLURM_REDIS_ABI @SLURM_REDIS_ABI@
 
-#define AUTO_PTR(fn) __attribute__((cleanup(fn)))
+#cmakedefine HAVE_ATTRIBUTE_CLEANUP
+#cmakedefine HAVE_ATTRIBUTE_UNUSED
 
 #cmakedefine HAVE_ASSERT_H
 #cmakedefine HAVE_ERRNO_H
@@ -42,11 +43,14 @@
 #cmakedefine HAVE_SYS_TYPES_H
 #cmakedefine HAVE_TIME_H
 
-#cmakedefine HAVE_ATTRIBUTE_CLEANUP
-#cmakedefine HAVE_ATTRIBUTE_UNUSED
-
+#cmakedefine ID_CACHE_SIZE @ID_CACHE_SIZE@
+#cmakedefine ID_CACHE_TTL @ID_CACHE_TTL@
+#cmakedefine FETCH_COUNT @FETCH_COUNT@
+#cmakedefine FETCH_LIMIT @FETCH_LIMIT@
 #cmakedefine ISO8601_DATES
 #cmakedefine QUERY_TTL @QUERY_TTL@
 #cmakedefine TTL @TTL@
+
+#define AUTO_PTR(fn) __attribute__((cleanup(fn)))
 
 #endif /* CONFIG_H */

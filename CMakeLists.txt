@@ -81,8 +81,24 @@ message(STATUS "Found Slurm source dir at ${SLURM_SOURCE_DIR}")
 
 option(ISO8601_DATES "Store ISO8601 dates in redis" ON)
 
+if(NOT ID_CACHE_SIZE)
+    set(ID_CACHE_SIZE "128")
+endif()
+
+if(NOT ID_CACHE_TTL)
+    set(ID_CACHE_TTL "120")
+endif()
+
+if(NOT FETCH_COUNT)
+    set(FETCH_COUNT "500")
+endif()
+
+if(NOT FETCH_LIMIT)
+    set(FETCH_LIMIT "1000")
+endif()
+
 if(NOT QUERY_TTL)
-    set(QUERY_TTL "300")
+    set(QUERY_TTL "60")
 endif()
 
 if(NOT TTL)

@@ -81,7 +81,7 @@ int sr_strtoul(const char *str, long unsigned int *ret)
 int sr_strtoull(const char *str, long long unsigned int *ret)
 {
     assert(str != NULL);
-    long long unsigned int i = strtoul(str, NULL, 10);
+    long long unsigned int i = strtoull(str, NULL, 10);
     if ((errno == ERANGE && (i == ULLONG_MAX))
         || (errno != 0 && i == 0)) {
         return -1;

@@ -28,34 +28,42 @@ check_include_files("assert.h" HAVE_ASSERT_H)
 if(NOT HAVE_ASSERT_H)
     message(FATAL_ERROR "assert.h not found")
 endif()
+
 check_include_files("errno.h" HAVE_ERRNO_H)
 if(NOT HAVE_ERRNO_H)
     message(FATAL_ERROR "errno.h not found")
 endif()
+
 check_include_files("limits.h" HAVE_LIMITS_H)
 if(NOT HAVE_LIMITS_H)
     message(FATAL_ERROR "limits.h not found")
 endif()
+
 check_include_files("stddef.h" HAVE_STDDEF_H)
 if(NOT HAVE_STDDEF_H)
     message(FATAL_ERROR "stddef.h not found")
 endif()
+
 check_include_files("stdint.h" HAVE_STDINT_H)
 if(NOT HAVE_STDINT_H)
     message(FATAL_ERROR "stdint.h not found")
 endif()
+
 check_include_files("stdio.h" HAVE_STDIO_H)
 if(NOT HAVE_STDIO_H)
     message(FATAL_ERROR "stdio.h not found")
 endif()
+
 check_include_files("string.h" HAVE_STRING_H)
 if(NOT HAVE_STRING_H)
     message(FATAL_ERROR "string.h not found")
 endif()
+
 check_include_files("sys/types.h" HAVE_SYS_TYPES_H)
 if(NOT HAVE_SYS_TYPES_H)
     message(FATAL_ERROR "sys/types.h not found")
 endif()
+
 check_include_files("time.h" HAVE_TIME_H)
 if(NOT HAVE_TIME_H)
     message(FATAL_ERROR "time.h not found")
