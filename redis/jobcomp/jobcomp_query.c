@@ -240,7 +240,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
     size_t i = 0;
     int match = QUERY_PASS;
 
-    // Check gid if specified
+    // Check gid
     if (qry->gids_sz) {
         match = QUERY_FAIL;
         if (gid.str) {
@@ -257,7 +257,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         return match;
     }
 
-    // Check jobname if specified
+    // Check jobname
     if (qry->jobnames_sz) {
         match = QUERY_FAIL;
         if (jobname.str) {
@@ -274,7 +274,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         return match;
     }
 
-    // Check partition if specified
+    // Check partition
     if (qry->partitions_sz) {
         match = QUERY_FAIL;
         if (partition.str) {
@@ -291,7 +291,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         return match;
     }
 
-    // Check job state if specified
+    // Check job state
     if (qry->states_sz) {
         match = QUERY_FAIL;
         if (state.str) {
@@ -308,7 +308,7 @@ static int job_query_check_job(const job_query_t qry, long long jobid)
         return match;
     }
 
-    // Check uid if specified
+    // Check uid
     if (qry->uids_sz) {
         match = QUERY_FAIL;
         if (uid.str) {

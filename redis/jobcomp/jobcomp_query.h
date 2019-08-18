@@ -63,7 +63,7 @@ int job_query_prepare(job_query_t qry);
 // Return last error and error size byref, integer status (enum)
 int job_query_error(job_query_t qry, const char **err, size_t *len);
 
-// Check if a job matches job query criteria
+// Find job matches and place them in matchset
 int job_query_match_jobs(job_query_t qry, const RedisModuleString *matchset);
 
 #endif /* JOBCOMP_QUERY_H */
