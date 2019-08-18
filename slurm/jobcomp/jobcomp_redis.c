@@ -423,6 +423,12 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     return job_list;
 }
 
+int slurm_jobcomp_archive(__attribute__((unused)) void *arch_cond)
+{
+    return SLURM_SUCCESS;
+}
+
+#if SLURM_VERSION_NUMBER < SLURM_VERSION_NUM(19,5,0)
 int slurm_jobcomp_get_errno(void)
 {
     return SLURM_SUCCESS;
@@ -432,8 +438,4 @@ char *slurm_jobcomp_strerror(__attribute__((unused)) int errnum)
 {
     return NULL;
 }
-
-int slurm_jobcomp_archive(__attribute__((unused)) void *arch_cond)
-{
-    return SLURM_SUCCESS;
-}
+#endif
