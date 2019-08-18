@@ -32,7 +32,7 @@
 #include <hiredis.h>
 #include <uuid.h>
 
-#include <slurm/slurm.h> /* List, SLURM_VERSION_NUMBER, ... */
+#include <slurm/slurm.h> /* SLURM_VERSION_NUMBER, slurm_list_next, ... */
 #include <slurm/spank.h> /* slurm_debug, ... */
 #include <src/common/xmalloc.h> /* xmalloc, ... */
 #include <src/common/xstring.h> /* xstrdup, ... */
@@ -100,8 +100,8 @@ static int redis_connected(void)
 static int redis_add_job_criteria(const char *key, const List list) {
     int pipeline = 0;
     const char *value;
-    AUTO_LITER ListIterator it = list_iterator_create(list);
-    while ((value = list_next(it))) {
+    AUTO_LITER ListIterator it = slurm_list_iterator_create(list);
+    while ((value = slurm_list_next(it))) {
         redisAppendCommand(ctx, "SADD %s %s", key, value);
         ++pipeline;
     }
@@ -114,8 +114,8 @@ static int redis_add_job_steps(const char *key, const List list) {
     int pipeline = 0;
     char buf[32];
     const slurmdb_selected_step_t *step;
-    AUTO_LITER ListIterator it = list_iterator_create(list);
-    while ((step = list_next(it))) {
+    AUTO_LITER ListIterator it = slurm_list_iterator_create(list);
+    while ((step = slurm_list_next(it))) {
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf)-1, "%u", step->jobid);
         redisAppendCommand(ctx, "SADD %s %s", key, buf);
@@ -279,7 +279,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     char uuid_s[37];
     char key[128];
     uuid_t uuid;
-    List job_list = list_create(jobcomp_destroy_job);
+    List job_list = slurm_list_create(jobcomp_destroy_job);
 
     // Generate a random uuid for the query keys
     uuid_generate(uuid);
@@ -308,42 +308,43 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     }
 
     // Create redis set for gid list
-    if ((job_cond->groupid_list) && list_count(job_cond->groupid_list)) {
+    if ((job_cond->groupid_list) && slurm_list_count(job_cond->groupid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:gid", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->groupid_list);
     }
 
     // Create redis set for job list
-    if ((job_cond->step_list) && list_count(job_cond->step_list)) {
+    if ((job_cond->step_list) && slurm_list_count(job_cond->step_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:job", prefix, uuid_s);
         pipeline += redis_add_job_steps(key, job_cond->step_list);
     }
 
     // Create redis set for jobname list
-    if ((job_cond->jobname_list) && list_count(job_cond->jobname_list)) {
+    if ((job_cond->jobname_list) && slurm_list_count(job_cond->jobname_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:jnm", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->jobname_list);
     }
 
     // Create redis set for partition list
-    if ((job_cond->partition_list) && list_count(job_cond->partition_list)) {
+    if ((job_cond->partition_list) &&
+            slurm_list_count(job_cond->partition_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:prt", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->partition_list);
     }
 
     // Create redis set for state list
-    if ((job_cond->state_list) && list_count(job_cond->state_list)) {
+    if ((job_cond->state_list) && slurm_list_count(job_cond->state_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:stt", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->state_list);
     }
 
     // Create redis set for uid list
-    if ((job_cond->userid_list) && list_count(job_cond->userid_list)) {
+    if ((job_cond->userid_list) && slurm_list_count(job_cond->userid_list)) {
         memset(key, 0, sizeof(key));
         snprintf(key, sizeof(key)-1, "%s:qry:%s:uid", prefix, uuid_s);
         pipeline += redis_add_job_criteria(key, job_cond->userid_list);
@@ -416,7 +417,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
                 jobcomp_destroy_job(job);
                 continue;
             }
-            list_append(job_list, job);
+            slurm_list_append(job_list, job);
         }
     } while (1);
 

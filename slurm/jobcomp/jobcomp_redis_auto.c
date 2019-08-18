@@ -42,7 +42,7 @@ void destroy_string(char **str)
 void destroy_list_iterator(ListIterator *it)
 {
     if (it && *it) {
-        list_iterator_destroy(*it);
+        slurm_list_iterator_destroy(*it);
         *it = NULL;
     }
 }

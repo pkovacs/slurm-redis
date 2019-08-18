@@ -28,7 +28,7 @@
 
 #include <hiredis.h>
 
-#include <src/common/list.h> /* ListIterator, ... */
+#include <slurm/slurm.h> /* ListIterator, ... */
 
 #include "common/redis_fields.h"
 
