@@ -58,6 +58,9 @@ static const char *pass = NULL;
 static const char *prefix = NULL;
 static redisContext *ctx = NULL;
 
+/*
+ * Connect to redis and try to authorize if we have a password
+ */
 static int redis_connect(void)
 {
     if (ctx) {
@@ -79,6 +82,9 @@ static int redis_connect(void)
     return SLURM_SUCCESS;
 }
 
+/*
+ * Check if we are connected to redis. Give me a ping. One ping only please.
+ */
 static int redis_connected(void)
 {
     if (!ctx) {
@@ -97,6 +103,10 @@ static int redis_connected(void)
     return 0;
 }
 
+/*
+ * Add strings from one of the char-based job_cond sub-lists to the criteria
+ * key: gid, job name, partition, uid, etc.
+ */
 static int redis_add_job_criteria(const char *key, const List list) {
     int pipeline = 0;
     const char *value;
@@ -110,6 +120,10 @@ static int redis_add_job_criteria(const char *key, const List list) {
     return pipeline;
 }
 
+/*
+ * Add integer job ids from the job_cond steps sub-list to the criteria key.
+ * The user is asking for specific job ids.
+ */
 static int redis_add_job_steps(const char *key, const List list) {
     int pipeline = 0;
     char buf[32];
@@ -126,6 +140,9 @@ static int redis_add_job_steps(const char *key, const List list) {
     return pipeline;
 }
 
+/*
+ * Initialize the plugin
+ */
 int init(void)
 {
     static int once = 0;
@@ -156,6 +173,9 @@ int init(void)
     return SLURM_SUCCESS;
 }
 
+/*
+ * De-initialize the plugin
+ */
 int fini(void)
 {
     if (ctx) {
@@ -170,6 +190,17 @@ int fini(void)
     return SLURM_SUCCESS;
 }
 
+/*
+ * Slurm is sending us the location string from the JobCompLoc config key.
+ *
+ * We interpret that value as a prefix to be prepending onto redis keys.
+ * If no location is used, redis job keys will be of the form "job:<id>".
+ * If a location prefix is used, keys will of the form "<prefix>:job:<id>".
+ * All keys, including the transient query and match keys will also use
+ * the location prefix if specified.
+ *
+ * You should keep the location prefix short to avoid wasting redis memory
+ */
 int slurm_jobcomp_set_location(char *location)
 {
     if (redis_connected()) {
@@ -191,6 +222,14 @@ int slurm_jobcomp_set_location(char *location)
     return SLURM_SUCCESS;
 }
 
+/*
+ * Log the completed job to redis.
+ *
+ * Each job is encoded as a redis hash set containing job data as field-value
+ * pairs. The members of the hash set are sent as a pipelined, multi-statement
+ * transaction, ending with the command SLURMJC.INDEX which indexes the job
+ * (opaquely) within redis
+ */
 int slurm_jobcomp_log_record(struct job_record *job)
 {
     if (!job) {
@@ -263,6 +302,19 @@ int slurm_jobcomp_log_record(struct job_record *job)
     return SLURM_SUCCESS;
 }
 
+/*
+ * A client such as sacct is asking for jobs which match some criteria.
+ *
+ * We take the job criteria from the job_cond record and send it to redis
+ * as a series of transient keys: one key (the main key) for the scalar
+ * data (start, end time, etc). Other keys are needed to represent set data,
+ * e.g. if a user requests a set of job ids or uids or partitions, etc.
+ * Once these query keys are delivered, we issue the command SLURMJC.MATCH
+ * which searches for jobs matching the criteria and returns the name of a
+ * key containing matching job ids.  If we get a matchset name, we then
+ * issue the command SLURMJC.FETCH in order to receive the job data which
+ * is then formatted and returned to slurm as the job list it requires
+ */
 List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
 {
     if (!job_cond) {
@@ -426,17 +478,26 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     return job_list;
 }
 
+/*
+ * Unused
+ */
 int slurm_jobcomp_archive(__attribute__((unused)) void *arch_cond)
 {
     return SLURM_SUCCESS;
 }
 
 #if SLURM_VERSION_NUMBER < SLURM_VERSION_NUM(19,5,0)
+/*
+ * Unused
+ */
 int slurm_jobcomp_get_errno(void)
 {
     return SLURM_SUCCESS;
 }
 
+/*
+ * Unused
+ */
 char *slurm_jobcomp_strerror(__attribute__((unused)) int errnum)
 {
     return NULL;

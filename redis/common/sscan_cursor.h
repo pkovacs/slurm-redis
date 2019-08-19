@@ -34,6 +34,7 @@
  * using the redis module api
  */
 
+// sscan_cursor return codes
 enum {
     SSCAN_ERR = -2,
     SSCAN_EOF = -1,
@@ -56,10 +57,10 @@ sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init);
 // Destroy a set scan cursor
 void destroy_sscan_cursor(sscan_cursor_t *cursor);
 
-// Return last error and error size byref, integer status (enum)
+// Return last error and error size byref
 int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len);
 
-// Return copy of next element byref, integer status (enum)
+// Return copy of next element byref
 int sscan_next_element(sscan_cursor_t cursor, RedisModuleString **str);
 
 #endif /* SSCAN_CURSOR_H */

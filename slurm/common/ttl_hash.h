@@ -32,6 +32,7 @@
  * A thread-safe hash for storing key/values with time-to-live (ttl)
  */
 
+// Hash return codes
 enum {
     HASH_BUSY = -1,
     HASH_OK = 0,

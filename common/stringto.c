@@ -34,6 +34,9 @@
 
 #include "stringto.h"
 
+/*
+ * Convert a string to a long int using base ten. Return 0 on success
+ */
 int sr_strtol(const char *str, long int *ret)
 {
     assert(str != NULL);
@@ -49,6 +52,9 @@ int sr_strtol(const char *str, long int *ret)
     return 0;
 }
 
+/*
+ * Convert a string to a long long int using base ten. Return 0 on success
+ */
 int sr_strtoll(const char *str, long long int *ret)
 {
     assert(str != NULL);
@@ -64,6 +70,9 @@ int sr_strtoll(const char *str, long long int *ret)
     return 0;
 }
 
+/*
+ * Convert a string to an unsigned long using base ten. Return 0 on success
+ */
 int sr_strtoul(const char *str, long unsigned int *ret)
 {
     assert(str != NULL);
@@ -78,6 +87,9 @@ int sr_strtoul(const char *str, long unsigned int *ret)
     return 0;
 }
 
+/*
+ * Convert a string to an unsigned long long using base ten. Return 0 on success
+ */
 int sr_strtoull(const char *str, long long unsigned int *ret)
 {
     assert(str != NULL);

@@ -31,6 +31,9 @@
 
 #include "jobcomp_redis_auto.h"
 
+/*
+ * Free a char buf
+ */
 void destroy_string(char **str)
 {
     if (str && *str) {
@@ -39,6 +42,9 @@ void destroy_string(char **str)
     }
 }
 
+/*
+ * Destroy a slurm list iterator
+ */
 void destroy_list_iterator(ListIterator *it)
 {
     if (it && *it) {
@@ -47,6 +53,9 @@ void destroy_list_iterator(ListIterator *it)
     }
 }
 
+/*
+ * Free the char bufs contained on a redis_field_t
+ */
 void destroy_redis_fields(redis_fields_t *fields)
 {
     if (fields) {
@@ -59,6 +68,9 @@ void destroy_redis_fields(redis_fields_t *fields)
     }
 }
 
+/*
+ * Free a redis reply and its contained sub-replies
+ */
 void destroy_redis_reply(redisReply **reply)
 {
     if (reply && *reply) {

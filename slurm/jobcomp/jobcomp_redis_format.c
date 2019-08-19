@@ -45,6 +45,9 @@
 static ttl_hash_t user_cache = NULL;
 static ttl_hash_t group_cache = NULL;
 
+/*
+ * Perform one-time initialization of the static data
+ */
 void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
 {
     assert(init != NULL);
@@ -60,12 +63,24 @@ void jobcomp_redis_format_init(const jobcomp_redis_format_init_t *init)
     group_cache = create_ttl_hash(&group_cache_init);
 }
 
+/*
+ * De-initialize the static data
+ */
 void jobcomp_redis_format_fini()
 {
     destroy_ttl_hash(&user_cache);
     destroy_ttl_hash(&group_cache);
 }
 
+/*
+ * Populate a redis_fields_t with data from a slurm job_record. The tmf
+ * parameter (time format) indicates how date/times are to be formatted
+ * (ISO8601, etc).  Note that some values are not explicitly encoded for
+ * redis in order to save memory.  For example, if exit code is observed
+ * to be "success" (0), no hash field for exit code is created in redis.
+ * When we reverse the process and read redis data, the absence of an exit
+ * code is intepreted as zero, etc.  Return SLURM_SUCCESS or SLURM_ERROR
+ */
 int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     redis_fields_t *fields)
 {
@@ -162,10 +177,6 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
         fields->value[kTimeLimit] = xstrdup(buf);
     }
 
-    // Below and all the way to the bottom of the function are data for which
-    // the absence of a value on the job record means we store no hash value
-    // in redis at all, thus saving memory.
-
     if (job->details) {
         if (job->details->submit_time) {
             fields->value[kSubmit] = jobcomp_redis_format_time(tmf,
@@ -234,6 +245,10 @@ int jobcomp_redis_format_fields(unsigned int tmf, const struct job_record *job,
     return SLURM_SUCCESS;
 }
 
+/*
+ * Format fields coming back from redis onto the job completion record
+ * needed by slurm.
+ */
 int jobcomp_redis_format_job(const redis_fields_t *fields,
     jobcomp_job_rec_t *job)
 {
@@ -368,6 +383,10 @@ int jobcomp_redis_format_job(const redis_fields_t *fields,
     return SLURM_SUCCESS;
 }
 
+/*
+ * Format a time_t into a string matching the requested format:
+ * ISO8601 or unix epoch.
+ */
 char *jobcomp_redis_format_time(unsigned int tmf, time_t t)
 {
     if (tmf == 1) {

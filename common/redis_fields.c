@@ -29,6 +29,9 @@
 
 #include "redis_fields.h"
 
+/*
+ * Field labels used for redis hash set fields
+ */
 const char *redis_field_labels[] = {
     "_abi",
     "_tmf",

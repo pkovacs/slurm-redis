@@ -38,7 +38,20 @@
 #include "jobcomp_query.h"
 
 /*
- * SLURMJC.INDEX <prefix> <jobid>
+ * SLURMJC.INDEX <prefix> <job id>
+ *
+ * This command will index the job in redis. The indexing scheme is as follows:
+ * Read the end date/time of the job and determine how many days that is since
+ * the unix epoch.  Create or update the redis set key matching that epoch days
+ * value, adding the job id to the set.  In other words, we place each job id
+ * into a daily bucket corresponding to its end time.
+ *
+ * When job query criteria arrives during the match process, it may or may not
+ * have explicit job ids enumerated.  If it does have job ids, we do not need
+ * to inspect any index at all, since we have direct access to each job key.
+ * If the criteria has no job ids, however, we look at the time range of the
+ * query, determine which indices need to be opened and visit the jobs in each
+ * index, asking if the job matches the rest of the criteria
  */
 int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
@@ -128,6 +141,15 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
 /*
  * SLURMJC.MATCH <prefix> <uuid>
+ *
+ * This command matches jobs in redis to the criteria sent from slurm.
+ * A job query object is created which reads the job criteria from the query
+ * keys, then a request to match jobs is issued.  If there are any matching
+ * jobs, a match key is created corresponding to the uuid of the request and
+ * that match key name is returned to the caller.  If the caller receives a
+ * match set name, the command SLURMJC.FETCH command can be issued to return
+ * the job data of the jobs in the matchset.  The matchset key has a limited
+ * TTL and will be deleted automatically if not read promptly by the caller
  */
 int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {
@@ -162,7 +184,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         .str = RedisModule_CreateStringPrintf(ctx, "%s:mat:%s", prefix, uuid)
     };
 
-    rc = job_query_match_jobs(qry, matchset.str);
+    rc = job_query_match(qry, matchset.str);
     if (rc == QUERY_ERR) {
         job_query_error(qry, &err, NULL);
         RedisModule_ReplyWithError(ctx, err);
@@ -196,16 +218,16 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 /*
  * SLURMJC.FETCH <prefix> <uuid> <max count>
  *
- * Reply is a nested array of job data.  The size of the outer array is the
- * number of jobs returned.  Each job is itself an array of MAX_REDIS_FIELDS
- * with each field of the job data in its designated array slot.  Fields may
- * contain empty (nil) data.
+ * Ths command returns a nested array of job data.  The size of the outer
+ * array is the number of jobs returned.  Each job is an inner array of
+ * MAX_REDIS_FIELDS with each field of the job data in the slot corresponding
+ * to the enum redis_fields_index.  Fields may contain empty (nil) data.
  *
  * This api consumes the match set as it reads it and is thus stateless.
  * The caller is expected to issue repeated calls to SLURMJC.FETCH until
  * the count of returned jobs is zero.  The max count parameter serves
  * to limit the job count of each reponse.  Receipt of fewer jobs than
- * max count is not a guarantee that all jobs have been returned.
+ * max count is not a guarantee that all jobs have been returned
  */
 int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 {

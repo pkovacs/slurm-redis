@@ -29,6 +29,9 @@
 
 #include "jobcomp_auto.h"
 
+/*
+ * Close a redis key
+ */
 void close_redis_key(RedisModuleKey **key)
 {
     if (key && *key) {
@@ -36,6 +39,9 @@ void close_redis_key(RedisModuleKey **key)
     }
 }
 
+/*
+ * Free the redis reply and its subreplies
+ */
 void destroy_redis_reply(RedisModuleCallReply **reply)
 {
     if (reply && *reply) {
@@ -44,6 +50,9 @@ void destroy_redis_reply(RedisModuleCallReply **reply)
     }
 }
 
+/*
+ * Free a redis module string using its context
+ */
 void destroy_redis_module_string(redis_module_string_t *str)
 {
     if (str && str->str) {
@@ -52,6 +61,9 @@ void destroy_redis_module_string(redis_module_string_t *str)
     }
 }
 
+/*
+ * Free an array of redis module strings using their context
+ */
 void destroy_redis_module_fields(redis_module_fields_t *fields)
 {
     if (fields) {

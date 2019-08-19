@@ -33,6 +33,7 @@
  * An abstract data type corresponding to slurm's slurmdb_job_cond_t
  */
 
+// Job query return status codes
 enum {
     QUERY_ERR = -2,
     QUERY_NULL = -1,
@@ -57,13 +58,13 @@ job_query_t create_job_query(const job_query_init_t *init);
 // Destroy a job query
 void destroy_job_query(job_query_t *qry);
 
-// Prepare the job query
+// Prepare the job query; return status
 int job_query_prepare(job_query_t qry);
 
-// Return last error and error size byref, integer status (enum)
+// Return last error and error size byref; return status
 int job_query_error(job_query_t qry, const char **err, size_t *len);
 
-// Find job matches and place them in matchset
-int job_query_match_jobs(job_query_t qry, const RedisModuleString *matchset);
+// Find job matches and place their ids in matchset; return status
+int job_query_match(job_query_t qry, const RedisModuleString *matchset);
 
 #endif /* JOBCOMP_QUERY_H */

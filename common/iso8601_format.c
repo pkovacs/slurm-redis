@@ -32,6 +32,9 @@
 #include <stddef.h>
 #include <stdio.h>
 
+/*
+ * Format a time_t into an ISO8601 time (GMT with tz/Z "Zulu/Zero")
+ */
 char *mk_iso8601(time_t t, char *iso8601)
 {
     if (!iso8601 || t < (time_t)0) {
@@ -45,6 +48,9 @@ char *mk_iso8601(time_t t, char *iso8601)
     return iso8601;
 }
 
+/*
+ * Convert an ISO8601 time (GMT with tz/Z) into a time_t
+ */
 time_t mk_time(const char *iso8601)
 {
     int y, M, d, h, m, s;

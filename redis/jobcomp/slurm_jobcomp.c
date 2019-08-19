@@ -34,6 +34,9 @@
 const char *module_name = "slurm_jobcomp";
 const int module_version = 1;
 
+/*
+ * Entry point for the redis module
+ */
 int RedisModule_OnLoad(RedisModuleCtx *ctx)
 {
     // Register the module

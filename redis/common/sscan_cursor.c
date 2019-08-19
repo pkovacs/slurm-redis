@@ -33,6 +33,9 @@
 
 #include "common/stringto.h"
 
+/*
+ * The sscan_cursor object
+ */
 typedef struct sscan_cursor {
     RedisModuleCtx *ctx;
     RedisModuleCallReply *reply;
@@ -45,8 +48,125 @@ typedef struct sscan_cursor {
     size_t array_sz;
 } *sscan_cursor_t;
 
+static void call_sscan_internal(sscan_cursor_t cursor);
+
+/*
+ * Create an sscan_cursor object
+ */
+sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init)
+{
+    assert(init != NULL);
+    assert(init->ctx != NULL);
+    assert(init->set != NULL);
+    assert(init->count > 0);
+
+    sscan_cursor_t cursor = RedisModule_Calloc(1, sizeof(struct sscan_cursor));
+    cursor->ctx = init->ctx;
+    cursor->set = init->set;
+    cursor->count = init->count;
+    cursor->value = -1;
+    return cursor;
+}
+
+/*
+ * Destroy an sscan_cursor object
+ */
+void destroy_sscan_cursor(sscan_cursor_t *cursor)
+{
+    if (!cursor) {
+        return;
+    }
+    if ((*cursor)->reply) {
+        // This recursively frees the subreplies too
+        RedisModule_FreeCallReply((*cursor)->reply);
+        (*cursor)->reply = NULL;
+        (*cursor)->subreply_array = NULL;
+    }
+    if ((*cursor)->err) {
+        RedisModule_FreeString((*cursor)->ctx, (*cursor)->err);
+        (*cursor)->err = NULL;
+    }
+    RedisModule_Free(*cursor);
+    *cursor = NULL;
+}
+
+/*
+ * Return the last sscan_cursor error and error length byref
+ */
+int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len)
+{
+    assert(cursor != NULL);
+    assert(cursor->ctx != NULL);
+
+    if (cursor->err && err) {
+        *err = RedisModule_StringPtrLen(cursor->err, len);
+        return SSCAN_ERR;
+    }
+    return SSCAN_OK;
+}
+
+/*
+ * Fetch the next element from the sscan cursor.  We are hiding the necessary
+ * repeated calls to SSCAN.  In order to complete a full iteration with SSCAN,
+ * it is required that we keep calling SSCAN until the cursor value on reply[0]
+ * is zero.  We read the array on reply[1] one at a time with each call to this
+ * api, then we issue another SSCAN and repeat until all set members are read
+ */
+int sscan_next_element(sscan_cursor_t cursor, RedisModuleString **str)
+{
+    assert(cursor != NULL);
+    assert(cursor->ctx != NULL);
+
+    if (cursor->err) {
+        RedisModule_FreeString(cursor->ctx, cursor->err);
+        cursor->err = NULL;
+    }
+
+    // Initial SSCAN requires a cursor value of zero
+    if (cursor->value == -1) {
+        cursor->value = 0;
+        call_sscan_internal(cursor);
+    }
+
+    // Do we need to issue another SSCAN?
+    while (cursor->value != 0 &&
+            ((cursor->subreply_array == NULL) ||
+             (cursor->array_ix >= cursor->array_sz))) {
+        call_sscan_internal(cursor);
+        if (cursor->err) {
+            return SSCAN_ERR;
+        }
+    }
+
+    // Are we done?
+    if (cursor->value == 0 &&
+        ((cursor->subreply_array == NULL) ||
+         (cursor->array_ix >= cursor->array_sz))) {
+        return SSCAN_EOF;
+    }
+
+    // If we have an array on the sub-reply, consume it one at a time
+    if (cursor->subreply_array &&
+        (cursor->array_ix < cursor->array_sz)) {
+        RedisModuleCallReply *subreply_element =
+            RedisModule_CallReplyArrayElement(cursor->subreply_array,
+                cursor->array_ix);
+        if (subreply_element && str) {
+            *str = RedisModule_CreateStringFromCallReply(subreply_element);
+        }
+        ++cursor->array_ix;
+    }
+    return SSCAN_OK;
+}
+
+/*
+ * Helper function to issue the SSCAN command and load the returned cursor
+ * value and array for reading by sscan_next_element
+ */
 static void call_sscan_internal(sscan_cursor_t cursor)
 {
+    assert(cursor != NULL);
+
     if (cursor->reply) {
         // This recursively frees the subreplies too
         RedisModule_FreeCallReply(cursor->reply);
@@ -94,102 +214,7 @@ static void call_sscan_internal(sscan_cursor_t cursor)
     if (sr_strtoll(RedisModule_CallReplyStringPtr(subreply_cursor, NULL),
         &cursor->value) < 0) {
         cursor->err = RedisModule_CreateStringPrintf(cursor->ctx,
-            "invalid cursor"); 
+            "invalid cursor");
         return;
     }
-}
-
-sscan_cursor_t create_sscan_cursor(const sscan_cursor_init_t *init)
-{
-    assert(init != NULL);
-    assert(init->ctx != NULL);
-    assert(init->set != NULL);
-    assert(init->count > 0);
-
-    sscan_cursor_t cursor = RedisModule_Calloc(1, sizeof(struct sscan_cursor));
-    cursor->ctx = init->ctx;
-    cursor->set = init->set;
-    cursor->count = init->count;
-    cursor->value = -1;
-    return cursor;
-}
-
-void destroy_sscan_cursor(sscan_cursor_t *cursor)
-{
-    if (!cursor) {
-        return;
-    }
-    if ((*cursor)->reply) {
-        // This recursively frees the subreplies too
-        RedisModule_FreeCallReply((*cursor)->reply);
-        (*cursor)->reply = NULL;
-        (*cursor)->subreply_array = NULL;
-    }
-    if ((*cursor)->err) {
-        RedisModule_FreeString((*cursor)->ctx, (*cursor)->err);
-        (*cursor)->err = NULL;
-    }
-    RedisModule_Free(*cursor);
-    *cursor = NULL;
-}
-
-int sscan_error(sscan_cursor_t cursor, const char **err, size_t *len)
-{
-    assert(cursor != NULL);
-    assert(cursor->ctx != NULL);
-    if (cursor->err && err) {
-        *err = RedisModule_StringPtrLen(cursor->err, len);
-        return SSCAN_ERR;
-    }
-    return SSCAN_OK;
-}
-
-int sscan_next_element(sscan_cursor_t cursor, RedisModuleString **str)
-{
-    assert(cursor != NULL);
-    assert(cursor->ctx != NULL);
-
-    if (cursor->err) {
-        RedisModule_FreeString(cursor->ctx, cursor->err);
-        cursor->err = NULL;
-    }
-
-    // Initial SSCAN requires a cursor value of zero
-    if (cursor->value == -1) {
-        cursor->value = 0;
-        call_sscan_internal(cursor);
-    }
-
-    // We are hiding the repeated calls to SSCAN.  In order to complete
-    // a full iteration with SSCAN, it is required that we keep calling
-    // SSCAN until the cursor value on reply[0] is zero. We consume the
-    // array on reply[1] one at a time with each sscan_next_element.
-    while (cursor->value != 0 &&
-            ((cursor->subreply_array == NULL) ||
-             (cursor->array_ix >= cursor->array_sz))) {
-        call_sscan_internal(cursor);
-        if (cursor->err) {
-            return SSCAN_ERR;
-        }
-    }
-
-    // Are we done?
-    if (cursor->value == 0 &&
-        ((cursor->subreply_array == NULL) ||
-         (cursor->array_ix >= cursor->array_sz))) {
-        return SSCAN_EOF;
-    }
-
-    // If we have an array on the sub-reply, consume it one at a time
-    if (cursor->subreply_array &&
-        (cursor->array_ix < cursor->array_sz)) {
-        RedisModuleCallReply *subreply_element =
-            RedisModule_CallReplyArrayElement(cursor->subreply_array,
-                cursor->array_ix);
-        if (subreply_element && str) {
-            *str = RedisModule_CreateStringFromCallReply(subreply_element);
-        }
-        ++cursor->array_ix;
-    }
-    return SSCAN_OK;
 }

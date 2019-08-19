@@ -40,12 +40,19 @@
 
 #define TTL_HASH_VALUE_SZ 32
 
+/*
+ * The TTL hash bucket supports one value only.  Collisions bump out
+ * the previous value
+ */
 typedef struct ttl_hash_bucket {
     time_t expiry;
     size_t key;
     char value[TTL_HASH_VALUE_SZ];
 } *ttl_hash_bucket_t;
 
+/*
+ * The TTL hash reports HASH_OK for members until their bucket expires
+ */
 typedef struct ttl_hash {
     size_t hash_sz;
     size_t hash_ttl;
@@ -54,6 +61,9 @@ typedef struct ttl_hash {
     pthread_rwlock_t rwlock;
 } *ttl_hash_t;
 
+/*
+ * The hash function
+ */
 static size_t hasher(size_t x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -61,6 +71,9 @@ static size_t hasher(size_t x) {
     return x;
 }
 
+/*
+ * Unlock a rwlock
+ */
 static void unlock_rwlock(pthread_rwlock_t **rwlock)
 {
     if (*rwlock) {
@@ -68,6 +81,9 @@ static void unlock_rwlock(pthread_rwlock_t **rwlock)
     }
 }
 
+/*
+ * Create a TTL hash
+ */
 ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
 {
     assert(init != NULL);
@@ -83,6 +99,9 @@ ttl_hash_t create_ttl_hash(const ttl_hash_init_t *init)
     return hash;
 }
 
+/*
+ * Destroy a TTL hash
+ */
 void destroy_ttl_hash(ttl_hash_t *hash)
 {
     if (!hash) {
@@ -94,6 +113,11 @@ void destroy_ttl_hash(ttl_hash_t *hash)
     xfree((*hash));
 }
 
+/*
+ * Lookup a value in the TTL hash.  Returns HASH_OK if found,
+ * HASH_NOT_FOUND if absent, HASH_EXPIRED if the bucket expired
+ * or HASH_BUSY if the lock has a problem
+ */
 int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
 {
     AUTO_PTR(unlock_rwlock) pthread_rwlock_t *lock = &hash->rwlock;
@@ -113,6 +137,10 @@ int ttl_hash_get(ttl_hash_t hash, size_t key, char **value)
     return HASH_OK;
 }
 
+/*
+ * Set a key/value in the TTL hash.  Returns HASH_OK on success
+ * or HASH_BUSY if the lock has a problem
+ */
 int ttl_hash_set(ttl_hash_t hash, size_t key, const char *value)
 {
     AUTO_PTR(unlock_rwlock) pthread_rwlock_t *lock = &hash->rwlock;
