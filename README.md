@@ -7,11 +7,7 @@
   - [Advanced configuration](#advanced-configuration)
 - [Slurm Configuration](#slurm-configuration)
 - [Redis Configuration](#redis-configuration)
-  - [Module Loading](#module-loading)
-  - [Port Binding](#port-binding)
-  - [Authentication](#authentication)
-  - [Persistence](#persistence)
-  - [System Config](#system-config)
+  - [Redis System Config](#redis-system-config)
 - [Usage](#usage)
 - [FAQ](#faq)
 
@@ -83,15 +79,37 @@ JobCompType=jobcomp/redis
 
 ### Redis Configuration
 
-#### Module Loading
+```bash
+# /etc/redis.conf
 
-#### Port Binding
+# Add a direcitve to load the slurm_jobcomp.so plugin
+loadmodule /usr/lib64/slurm/redis/slurm_jobcomp.so
 
-#### Authentication
+# Change the default listen address from 127.0.0.1 to an address reachable
+# by the slurm job controller slurmctld and sacct clients
+#bind 127.0.0.1
+bind <ip address>
 
-#### Persistence
+# if you want to use redis authentication, set a password and make sure
+# to add the password to slurm's JobCompPass config key
+requirepass <password>
 
-#### System Config
+# Pay some attention to redis persistence settings and possibly adjust those
+# as needed
+```
+
+#### Redis System Config
+
+After you start redis, check its logs, `/var/log/redis/redis.log`, for any
+complaints it may have about your system configuration.  In particular, redis
+does not like to operate with transparent huge pages activated.  There are a 
+number of ways to turn that off:
+
+- `cat /sys/kernel/mm/transparent_hugepage/enabled` to check your system
+- add `transparent_hugepage=never` to your kernel boot comand (`cat /proc/cmdline`)
+- `echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled` at system start
+
+There may be some other system settings, e.g. overcommit_memory, that you need to adjust using `/etc/sysctl.conf`.  Refer to the redis log file for more details.
 
 ### Usage
 
