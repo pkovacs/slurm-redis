@@ -191,7 +191,7 @@ int job_query_prepare(job_query_t qry)
     // Load the start/end time criteria into the query: ISO8601 or unix epoch
     long long _tmf;
     if (RedisModule_StringToLongLong(tmf.str, &_tmf) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(qry->ctx, "invalid _tmf");
+        qry->err = RedisModule_CreateStringPrintf(qry->ctx, "invalid _tmf");
         return QUERY_ERR;
     }
 
@@ -563,7 +563,7 @@ static int job_query_match_job(const job_query_t qry, long long jobid)
 
     long long _tmf;
     if (RedisModule_StringToLongLong(tmf.str, &_tmf) == REDISMODULE_ERR) {
-        RedisModule_ReplyWithError(qry->ctx, "invalid _tmf");
+        qry->err = RedisModule_CreateStringPrintf(qry->ctx, "invalid _tmf");
         return QUERY_ERR;
     }
 
