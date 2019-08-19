@@ -17,7 +17,7 @@
 
 ### Purpose and Design Goals
 
-I wanted a lightweight and _fast_ job completion plugin for slurm that has fairly good support for client-side filtering of job completion criteria.  Redis fits this need very nicely because it is memory-based and very fast indeed.  This jobcomp_redis plugin can  produce permanent redis keys or, using redis key expiry, it can produce keys which live only for as long as you configure.  This makes the jobcomp_redis plugin a good complement to accounting storage plugins, e.g. mysql/mariadb.  For example, you could configure the jobcomp_redis plugin so that keys live for only a week, thus implementing a super-fast, memory-based cache of a rolling week's worth of jobs.  If you save the keys permanently (the default), you can configure redis persistence to suite your needs.
+I wanted a fast, lightweight job completion plugin for slurm that has fairly good support for client-side filtering of job completion criteria.  Redis fits this need very nicely because it is memory-based and very fast indeed.  This jobcomp_redis plugin can  produce permanent redis keys or, using redis key expiry, it can produce keys which live only for as long as you configure.  This makes the jobcomp_redis plugin a good complement to accounting storage plugins, e.g. mysql/mariadb.  For example, you could configure the jobcomp_redis plugin so that keys live for only a week, thus implementing a super-fast, memory-based cache of a rolling week's worth of jobs.  If you save the keys permanently (the default), you can configure redis persistence to suite your needs.
 
 In terms of design, the jobcomp_redis slurm plugin works with a partner plugin that I also wrote for this project, slurm_jobcomp, which is loaded into redis and implements specialized commands that are invoked by the slurm-side plugin when jobs complete or when clients such as `sacct` request job data.  This provides nice separation of concerns and minimizes network traffic.  To elaborate on that: the slurm-side plugin issues the custom redis command `SLURMJC.INDEX` after it sends job data to redis, but the indexing scheme itself is completely opaque to slurm and fully the responsiblility of the redis-side partner.
 
@@ -84,10 +84,22 @@ $ sudo make install
 
 ```bash
 # Show my recently completed jobs
-$ sacct -c
-
-# Show my jobs in long form
 $ sacct -cl
+
+# Show my jobs that failed this morning
+$ sacct -cl -S09:00 -E12:00 --status=FAILED
+
+# Show my jobs that ran successfully on at least 10 nodes
+$ sacct -cl --state=CD --nnodes=10
+
+# Show my jobs that ran successfully on partition alpha and used no more than 5 nodes
+$ sacct -cl --state=CD --nnodes=0-5 --partition=alpha
+
+# Show the completion status of my jobs named spatial and temporal
+$ sacct -cl --name=spatial,temporal
+
+# Show the completion status of jobs 2142, 2143 and 2144
+$ sacct -cl --jobs=2142,2143,2144
 ```
 
 ### FAQ
