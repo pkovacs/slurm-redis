@@ -17,11 +17,11 @@
 
 ### Purpose and Design Goals
 
-I wanted a fast, lightweight job completion plugin for slurm that has fairly good support for client-side filtering of job completion criteria.  Redis fits this need very nicely because it is memory-based and very fast indeed.  This jobcomp_redis plugin can  produce permanent redis keys or, using redis key expiry, it can produce keys which live only for as long as you configure.  This makes the jobcomp_redis plugin a good complement to accounting storage plugins, e.g. mysql/mariadb.  For example, you could configure the jobcomp_redis plugin so that keys live for only a week, thus implementing a super-fast, memory-based cache of a rolling week's worth of jobs.  If you save the keys permanently (the default), you can configure redis persistence to suite your needs.
+I wanted a fast, lightweight job completion plugin for slurm that has good support for client-side filtering of job completion criteria.  Redis fits this need very nicely because it is memory-based and very fast indeed.  This jobcomp_redis plugin can  produce permanent redis keys or, using redis key expiry, it can produce keys which live only for a duration that you configure.  The jobcomp_redis plugin can be a good complement to accounting storage plugins, e.g. mysql/mariadb.  For example, you could configure the jobcomp_redis plugin so that keys live only for a week, thus implementing a super-fast, memory-based cache of a rolling week's worth of jobs.  If you save the keys permanently (the default), you can configure redis persistence to suit your needs, write scripts to manage your redis job data, etc.
 
 In terms of design, the jobcomp_redis slurm plugin works with a partner plugin that I also wrote for this project, slurm_jobcomp, which is loaded into redis and implements specialized commands that are invoked by the slurm-side plugin when jobs complete or when clients such as `sacct` request job data.  This provides nice separation of concerns and minimizes network traffic.  To elaborate on that: the slurm-side plugin issues the custom redis command `SLURMJC.INDEX` after it sends job data to redis, but the indexing scheme itself is completely opaque to slurm and fully the responsiblility of the redis-side partner.
 
-When job data is requested from slurm, jobcomp_redis sends job _criteria_ to redis and then issues the command `SLURMJC.MATCH` to ask redis to perform the job matching.  In this way, we avoid pulling job candidates across the wire just to test if they match which can waste network bandwidth and slow us down.  If matches are found, the slurm-side partner will issue `SLURMJC.FETCH` to receive the job data from redis.
+When job data is requested from slurm, jobcomp_redis sends job criteria to redis and then issues the command `SLURMJC.MATCH` to ask redis to perform the job matching.  In this way, we avoid pulling job candidates across the wire just to test if they match which can waste network bandwidth and slow us down.  If matches are found, the slurm-side partner will issue `SLURMJC.FETCH` to receive the job data from redis.
 
 Let me know if you find this plugin useful.  More plugins to follow ...
 
@@ -53,6 +53,7 @@ To configure, build and run this package from source you will need the following
 #       matching your current slurm installation.
 #   - hint: a configured source tree is one in which slurm/slurm.h exists.
 #
+
 $ tar -xjf slurm-redis-0.1.0-Source.tar.bz2
 $ cd slurm-redis-0.1.0-Source
 $ mkdir build
@@ -60,6 +61,7 @@ $ cd build
 $ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INCLUDE_PATH=/home/phil/slurm-19.05.2/ ..
 $ make
 $ sudo make install
+
 # restart slurmctld and redis if they are running with previous versions
 # of their respective plugins
 ```
@@ -67,6 +69,17 @@ $ sudo make install
 #### Advanced configuration
 
 ### Slurm Configuration
+
+```bash
+# /etc/slurm/slurm.conf
+
+JobCompHost=<redis listen ip>
+JobCompLoc=<an optional, (short!) prefix to prepend to your redis keys>
+JobCompPass=<redis password, if redis configured for password authentication>
+JobCompPort=<redis listen port, e.g. 6379>
+JobCompType=jobcomp/redis
+#JobCompUser=<unusued, redis has no notion of user>
+```
 
 ### Redis Configuration
 
