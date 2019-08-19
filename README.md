@@ -50,17 +50,30 @@ To configure, build and run this package from source you will need the following
 #   - hint: a configured source tree is one in which slurm/slurm.h exists.
 #
 
-$ tar -xjf slurm-redis-0.1.0-Source.tar.bz2
+$ tar -xjf slurm-redis-0.1.0.tar.bz2
 $ cd slurm-redis-0.1.0-Source
 $ mkdir build
 $ cd build
 $ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INCLUDE_PATH=/home/phil/slurm-19.05.2/ ..
 $ make
 $ sudo make install
-
-# restart slurmctld and redis if they are running with previous versions
-# of their respective plugins
 ```
+
+Restart `slurmctld` if it was running with a previous `jobcomp_redis.so` loaded. You do not have to restart redis to load a newer version of the `slurm_jobcomp.so` plugin.  Keys can be lost if you restart redis in between its persistence cycles.  Instead, simply open a redis cli and manually unload the current module, then load the new module:
+
+```bash
+redis-cli -h <host>
+redis-cli> auth <password>
+OK
+redis-cli> module unload slurm_jobcomp
+OK
+redis-cli> module load /usr/lib64/slurm/redis/slurm_jobcomp.so
+OK
+```
+
+
+
+
 
 #### Advanced configuration
 
@@ -82,7 +95,7 @@ JobCompType=jobcomp/redis
 ```bash
 # /etc/redis.conf
 
-# Add a direcitve to load the slurm_jobcomp.so plugin
+# Add a directive to load the slurm_jobcomp.so plugin
 loadmodule /usr/lib64/slurm/redis/slurm_jobcomp.so
 
 # Change the default listen address from 127.0.0.1 to an address reachable
