@@ -120,7 +120,7 @@ JobCompLoc=<an optional, (short!) prefix to prepend to your redis keys>
 JobCompPass=<redis password, if redis configured for password authentication>
 JobCompPort=<redis listen port, e.g. 6379>
 JobCompType=jobcomp/redis
-#JobCompUser=<unusued, redis has no notion of user>
+#JobCompUser=<unused, redis has no notion of user>
 ```
 
 ### Redis Configuration
@@ -134,7 +134,7 @@ loadmodule /usr/lib64/slurm/redis/slurm_jobcomp.so
 # Change the default listen address from 127.0.0.1 to an address reachable
 # by the slurm job controller slurmctld and sacct clients
 #bind 127.0.0.1
-bind <ip address>
+bind <ip address> 127.0.0.1
 
 # if you want to use redis authentication, set a password and make sure
 # to add the password to slurm's JobCompPass config key
@@ -160,7 +160,7 @@ There may be some other system settings, e.g. overcommit_memory, that you need t
 ### Usage
 
 ```bash
-# sacct switches that work:
+# sacct filtering switches that work with jobcomp_redis:
 
   --start=     // start time
   --end=       // end time
@@ -173,6 +173,10 @@ There may be some other system settings, e.g. overcommit_memory, that you need t
   --partition= // partition list
   --job=       // job id list
   --name=      // job name list
+
+# NOTE: pay attention to slurm's DEFAULT TIME WINDOW (see: man sacct) since some
+# combinations of the --job and --state switches can yield unintuitive time ranges
+# and thus require you to use -S and -E to get the time range you really want.
 
 # Show my recently completed jobs
 $ sacct -cl
