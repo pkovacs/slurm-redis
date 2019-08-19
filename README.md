@@ -1,6 +1,6 @@
 ## Slurm Job Completion Plugin for Redis <!-- omit in toc -->
 
-- [Purpose and Design Goals](#purpose-and-design-goals)
+- [Purpose and Design](#purpose-and-design)
 - [Requirements](#requirements)
 - [Plugin Configuration](#plugin-configuration)
   - [Basic configuration](#basic-configuration)
@@ -11,7 +11,7 @@
 - [Usage](#usage)
 - [FAQ](#faq)
 
-### Purpose and Design Goals
+### Purpose and Design
 
 I wanted a fast, lightweight job completion plugin for slurm that has good support for client-side filtering of job completion criteria.  Redis fits this need very nicely because it is memory-based and very fast indeed.  This jobcomp_redis plugin can  produce permanent redis keys or, using redis key expiry, it can produce keys which live only for a duration that you configure.  The jobcomp_redis plugin can be a good complement to accounting storage plugins, e.g. mysql/mariadb.  For example, you could configure the jobcomp_redis plugin so that keys live only for a week, thus implementing a super-fast, memory-based cache of a rolling week's worth of jobs.  If you save the keys permanently (the default), you can configure redis persistence to suit your needs, write scripts to manage your redis job data, etc.
 
@@ -160,6 +160,20 @@ There may be some other system settings, e.g. overcommit_memory, that you need t
 ### Usage
 
 ```bash
+# sacct switches that work:
+
+  --start=     // start time
+  --end=       // end time
+  --uid=       // uid list
+  --user=      // user list
+  --gid=       // gid list
+  --group=     // group list
+  --nnodes=    // number of nodes min/max
+  --state=     // job completion state (CD=COMPLETED, F=FAILED, etc.)
+  --partition= // partition list
+  --job=       // job id list
+  --name=      // job name list
+
 # Show my recently completed jobs
 $ sacct -cl
 
