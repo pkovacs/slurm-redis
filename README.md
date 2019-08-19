@@ -51,7 +51,7 @@ To configure, build and run this package from source you will need the following
 #
 
 $ tar -xjf slurm-redis-0.1.0.tar.bz2
-$ cd slurm-redis-0.1.0-Source
+$ cd slurm-redis-0.1.0
 $ mkdir build
 $ cd build
 $ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INCLUDE_PATH=/home/phil/slurm-19.05.2/ ..
@@ -71,11 +71,44 @@ redis-cli> module load /usr/lib64/slurm/redis/slurm_jobcomp.so
 OK
 ```
 
-
-
-
-
 #### Advanced configuration
+
+```bash
+# cmake -DUSE_ISO8601 (default)
+
+This setting will cause the slurm jobcomp_redis plugin to send all date/time elements
+as ISO8601 strings, GMT with timezone "Z" (Zero/Zulu), thus all date/times will be
+human-readable and normalized to that timezone.
+
+# cmake -DUSE_ISO8601=0
+
+This setting will cause all date/times to be stored as integers (redis strings) --
+the number of seconds since the unix epoch.
+
+# cmake -DTTL=<N> (default -1 = permanent key)
+
+This setting will set the time-to-live in seconds of your job completion data.  If you
+use -DTTL=86400, your job keys will disappear after 1 day.   The default is -1: keys
+are permanent.  Use this setting if you want a fast but temporary cache of recent job
+data.
+
+# cmake -DQUERY_TTL=<N> (default 60)
+
+This setting should not need to be changed.  When clients such as saact request job data,
+the jobcomp_redis plugin sends the job criteria to redis as a set of transient keys and
+then issues SLURMJC.MATCH.  The brief latency between the time that the criteria arrives
+in redis and the command SLURMJC.MATCH starts in redis is where this setting matters.
+
+# cmake -DFETCH_LIMIT=<N> (default 1000)
+
+The maximum number of jobs redis will allow to be sent to the client in one iteration
+of SLURMJC.FETCH.
+
+# cmake -DFETCH_COUNT=<N> (default 500)
+
+The maximum number of jobs the client would like to receive in one iteration of
+SLURMJC.FETCH.
+```
 
 ### Slurm Configuration
 
