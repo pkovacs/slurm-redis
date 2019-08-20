@@ -59,7 +59,7 @@ $ make
 $ sudo make install
 ```
 
-Restart `slurmctld` if it was running with a previous `jobcomp_redis.so` loaded. You do not have to restart redis to load a newer version of the `slurm_jobcomp.so` plugin.  Keys can be lost if you restart redis in between its persistence cycles.  Instead, simply open a redis cli and manually unload the current module, then load the new module:
+After installing the plugins, restart `slurmctld` if it was running with a previous `jobcomp_redis.so` loaded. You do not have to restart redis, however, in order to load a newer version of the `slurm_jobcomp.so` plugin, in fact, keys can be lost if you restart redis in between its persistence cycles.  Instead, simply open a redis cli and manually unload the current module, then load the new module (or write a script to do this):
 
 ```bash
 redis-cli -h <host>
