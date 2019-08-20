@@ -1,0 +1,5 @@
+This file provides a summary of changes in the releases of slurm-redis
+
+Changes in v0.1.1
+=================
+-- ensure only one redis ping occurs when already connected
