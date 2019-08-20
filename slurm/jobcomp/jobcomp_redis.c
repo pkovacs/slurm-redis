@@ -237,9 +237,9 @@ int slurm_jobcomp_log_record(struct job_record *job)
     }
     if (!redis_connected()) {
         redis_connect();
-    }
-    if (!redis_connected()) {
-        return SLURM_ERROR;
+        if (!redis_connected()) {
+            return SLURM_ERROR;
+        }
     }
 
     AUTO_FIELDS redis_fields_t fields = {0};
@@ -322,9 +322,9 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     }
     if (!redis_connected()) {
         redis_connect();
-    }
-    if (!redis_connected()) {
-        return NULL;
+        if (!redis_connected()) {
+            return NULL;
+        }
     }
 
     int i, err = 0, pipeline = 0;
