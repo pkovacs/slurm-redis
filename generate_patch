@@ -185,50 +185,50 @@ slurm_jobcomp_la_LIBADD =
 '
 }
 
-# Test that $1 is a git repo
-git -C $1 rev-parse >/dev/null 2>&1
+# Test that $2 is a (slurm) git repo
+git -C $2 rev-parse >/dev/null 2>&1
 if [ $? -ne 0 ]; then
-    echo "$1 is not a git repo"
+    echo "$2 is not a git repo"
     exit 2
 fi
 
-# Test that $1 is a clean git repo
-if [ ! -z "$(git status --untracked-files=no --porcelain)" ]; then
-    echo "$1 is not a clean git repo"
-    #exit 2
-fi
-
-# Test that $1/slurm dir exists
-if [ ! -d "$1/slurm" ]; then
-    echo "$1/slurm directory does not exist"
+# Test that $2 is a clean (slurm) git repo
+if [ ! -z "$(git -C $2 status --untracked-files=no --porcelain)" ]; then
+    echo "$2 is not a clean git repo"
     exit 2
 fi
 
-# Patch the slurm git tree
+# Test that $2/slurm dir exists
+if [ ! -d "$2/slurm" ]; then
+    echo "$2/slurm directory does not exist"
+    exit 2
+fi
+
+# Apply changes to the slurm git tree via cp and sed
 declare -a cmd=(
-    "mkdir -p $1/src/plugins/jobcomp/common"
-    "mkdir -p $1/src/plugins/jobcomp/redis"
-    "mkdir -p $1/src/plugins/redis"
-    "mkdir -p $1/src/plugins/redis/common"
-    "mkdir -p $1/src/plugins/redis/jobcomp"
-    "cp $2/common/*.[ch] $1/src/common/"
-    "cp $2/slurm/common/*.[ch] $1/src/plugins/jobcomp/common/"
-    "cp $2/slurm/jobcomp/*.[ch] $1/src/plugins/jobcomp/redis/"
-    "cp $2/redis/common/*.[ch] $1/src/plugins/redis/common/"
-    "cp $2/redis/jobcomp/*.[ch] $1/src/plugins/redis/jobcomp/"
-    "cp $3/auxdir/x_ac_slurm_redis.m4 $1/auxdir/"
-    "sed -i -e\"$(sed_configure_ac)\" $1/configure.ac"
-    "sed -i -e\"$(sed_src_common_makefile)\" $1/src/common/Makefile.am"
-    "sed -i -e\"$(sed_src_plugins_makefile)\" $1/src/plugins/Makefile.am"
-    "sed -i -e\"$(sed_src_plugins_jobcomp_makefile)\" $1/src/plugins/jobcomp/Makefile.am"
-    "echo \"$(makefile_src_plugins_jobcomp_common)\" > $1/src/plugins/jobcomp/common/Makefile.am"
-    "echo \"$(makefile_src_plugins_jobcomp_redis)\" > $1/src/plugins/jobcomp/redis/Makefile.am"
-    "echo \"$(makefile_src_plugins_redis)\" > $1/src/plugins/redis/Makefile.am"
-    "echo \"$(makefile_src_plugins_redis_common)\" > $1/src/plugins/redis/common/Makefile.am"
-    "echo \"$(makefile_src_plugins_redis_jobcomp)\" > $1/src/plugins/redis/jobcomp/Makefile.am"
+    "mkdir -p $2/src/plugins/jobcomp/common"
+    "mkdir -p $2/src/plugins/jobcomp/redis"
+    "mkdir -p $2/src/plugins/redis"
+    "mkdir -p $2/src/plugins/redis/common"
+    "mkdir -p $2/src/plugins/redis/jobcomp"
+    "cp $3/common/*.[ch] $2/src/common/"
+    "cp $3/slurm/common/*.[ch] $2/src/plugins/jobcomp/common/"
+    "cp $3/slurm/jobcomp/*.[ch] $2/src/plugins/jobcomp/redis/"
+    "cp $3/redis/common/*.[ch] $2/src/plugins/redis/common/"
+    "cp $3/redis/jobcomp/*.[ch] $2/src/plugins/redis/jobcomp/"
+    "cp $4/patch/x_ac_slurm_redis.m4 $2/auxdir/"
+    "sed -i -e\"$(sed_configure_ac)\" $2/configure.ac"
+    "sed -i -e\"$(sed_src_common_makefile)\" $2/src/common/Makefile.am"
+    "sed -i -e\"$(sed_src_plugins_makefile)\" $2/src/plugins/Makefile.am"
+    "sed -i -e\"$(sed_src_plugins_jobcomp_makefile)\" $2/src/plugins/jobcomp/Makefile.am"
+    "echo \"$(makefile_src_plugins_jobcomp_common)\" > $2/src/plugins/jobcomp/common/Makefile.am"
+    "echo \"$(makefile_src_plugins_jobcomp_redis)\" > $2/src/plugins/jobcomp/redis/Makefile.am"
+    "echo \"$(makefile_src_plugins_redis)\" > $2/src/plugins/redis/Makefile.am"
+    "echo \"$(makefile_src_plugins_redis_common)\" > $2/src/plugins/redis/common/Makefile.am"
+    "echo \"$(makefile_src_plugins_redis_jobcomp)\" > $2/src/plugins/redis/jobcomp/Makefile.am"
 )
 for (( i = 0; i < ${#cmd[@]} ; i++ )); do
-    printf "Running: ${cmd[$i]}\n"
+    #printf "Running: ${cmd[$i]}\n"
     eval "${cmd[$i]}"
     if [ $? -ne 0 ]; then
         echo "error running: ${cmd[$i]}"
@@ -238,13 +238,19 @@ done;
 
 # Create the patch by combining git diffs of the tracked and untracked files
 # that we changed
-pushd $1
-patch_name="`git rev-parse --abbrev-ref HEAD | sed -e 's/slurm/slurm-redis/'`"
+pushd $2 >/dev/null
+patch_name=$1-
+patch_name+="`git rev-parse --abbrev-ref HEAD`"
 patch_name+=".patch"
 
-git diff > $3/$patch_name
+git diff > $4/$patch_name
 git ls-files --others --exclude-standard auxdir |
-    while read -r i; do git diff /dev/null "$i" >> $3/$patch_name; done
+    while read -r i; do git diff /dev/null "$i" >> $4/$patch_name; done
 git ls-files --others --exclude-standard src |
-    while read -r i; do git diff /dev/null "$i" >> $3/$patch_name; done
-popd
+    while read -r i; do git diff /dev/null "$i" >> $4/$patch_name; done
+
+popd >/dev/null
+pushd $4 >/dev/null
+bzip2 -f $patch_name
+sha1sum ${patch_name}.bz2 > ${patch_name}.bz2.sha1
+popd >/dev/null
