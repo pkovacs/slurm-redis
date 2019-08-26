@@ -22,8 +22,14 @@
 # SOFTWARE.
 #
 
-project(slurm-redis C)
+cmake_policy(VERSION 3.4.0)
 cmake_minimum_required(VERSION 3.4.0 FATAL_ERROR)
+
+project(slurm-redis
+    VERSION 0.1.1
+    DESCRIPTION "Redis plugins for slurm"
+    HOMEPAGE_URL "https://github.com/pkovacs/slurm-redis"
+    LANGUAGES C)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(GNUInstallDirs)
@@ -41,12 +47,9 @@ include(FindSymbols)
 include(FindLibraries)
 include(TestCompiler)
 
-# -------------------
-# Set project version
-# -------------------
-set(SLURM_REDIS_VERSION_MAJOR 0)
-set(SLURM_REDIS_VERSION_MINOR 1)
-set(SLURM_REDIS_VERSION_PATCH 0)
+# ---------------
+# Set ABI version
+# ---------------
 set(SLURM_REDIS_ABI 0)
 
 # -----------------
@@ -70,30 +73,32 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(USE_ISO8601 "Use ISO8601 date/time format in redis" ON)
-
-if(NOT ID_CACHE_SIZE)
-    set(ID_CACHE_SIZE "128")
+if(NOT JCR_CACHE_SIZE)
+    set(JCR_CACHE_SIZE "128")
 endif()
 
-if(NOT ID_CACHE_TTL)
-    set(ID_CACHE_TTL "120")
+if(NOT JCR_CACHE_TTL)
+    set(JCR_CACHE_TTL "120")
 endif()
 
-if(NOT FETCH_COUNT)
-    set(FETCH_COUNT "500")
+if(NOT JCR_FETCH_COUNT)
+    set(JCR_FETCH_COUNT "500")
 endif()
 
-if(NOT FETCH_LIMIT)
-    set(FETCH_LIMIT "1000")
+if(NOT JCR_FETCH_LIMIT)
+    set(JCR_FETCH_LIMIT "1000")
 endif()
 
-if(NOT QUERY_TTL)
-    set(QUERY_TTL "60")
+if(NOT JCR_QUERY_TTL)
+    set(JCR_QUERY_TTL "60")
 endif()
 
-if(NOT TTL)
-    set(TTL "-1")
+if(NOT JCR_TTL)
+    set(JCR_TTL "-1")
+endif()
+
+if(NOT JCR_TMF)
+    set(JCR_TMF "1")
 endif()
 
 # --------------
@@ -123,18 +128,28 @@ add_subdirectory(common)
 add_subdirectory(redis)
 add_subdirectory(slurm)
 
+# ----------------------
+# Generate a slurm patch
+# ----------------------
+configure_file(
+    ${CMAKE_SOURCE_DIR}/patch/x_ac_slurm_redis.m4.in
+    ${CMAKE_BINARY_DIR}/patch/x_ac_slurm_redis.m4
+)
+add_custom_target(patch ${CMAKE_SOURCE_DIR}/generate_patch
+    ${PROJECT_NAME}-${PROJECT_VERSION} ${CMAKE_INCLUDE_PATH}
+    ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}
+    DEPENDS ${CMAKE_BINARY_DIR}/patch/x_ac_slurm_redis.m4
+)
+
 # -----------------
 # Add CPack support
 # -----------------
 set(CPACK_GENERATOR "RPM")
 set(CPACK_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-set(CPACK_PACKAGE_VERSION_MAJOR ${SLURM_REDIS_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${SLURM_REDIS_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${SLURM_REDIS_VERSION_PATCH})
-string(CONCAT CPACK_PACKAGE_VERSION
-    "${SLURM_REDIS_VERSION_MAJOR}."
-    "${SLURM_REDIS_VERSION_MINOR}."
-    "${SLURM_REDIS_VERSION_PATCH}")
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION})
 set(CPACK_PACKAGE_CHECKSUM "SHA1")
 set(CPACK_SOURCE_GENERATOR "TGZ;TBZ2")

@@ -2,14 +2,16 @@
 
 - [Purpose and Design](#purpose-and-design)
 - [Requirements](#requirements)
-- [Plugin Configuration](#plugin-configuration)
-  - [Basic configuration](#basic-configuration)
+  - [Build slurm-redis using provided slurm patch set](#build-slurm-redis-using-provided-slurm-patch-set)
+  - [Build slurm-redis using native build system](#build-slurm-redis-using-native-build-system)
   - [Advanced configuration](#advanced-configuration)
 - [Slurm Configuration](#slurm-configuration)
 - [Redis Configuration](#redis-configuration)
   - [Redis System Config](#redis-system-config)
 - [Usage](#usage)
 - [FAQ](#faq)
+
+___
 
 ### Purpose and Design
 
@@ -20,22 +22,57 @@ In terms of design, the jobcomp_redis slurm plugin works with a partner plugin t
 When job data is requested from slurm, jobcomp_redis sends job criteria to redis and then issues the command `SLURMJC.MATCH` to ask redis to perform the job matching.  In this way, we avoid pulling job candidates across the wire just to test if they match which can waste network bandwidth and slow us down.  If matches are found, the slurm-side partner will issue `SLURMJC.FETCH` to receive the job data from redis.
 
 Let me know if you find this plugin useful.  More plugins to follow ...
+___
 
 ### Requirements
 
-To configure, build and run this package from source you will need the following:
-- a working slurm installation with slurm libraries (including `libslurm.so` symlink) in your library search path
-- a *_configured_* slurm source tree (`slurm/slurm.h` exists) that *_matches_* your slurm installation
-- `gcc` and `pkg-config` which you already have if you've built slurm successfully
-- [cmake](https://cmake.org/), a relatively recent version (3.4.0+)
+Two methods are provided for building this package from source:
+1. A patch set that applies patches directly over the slurm source tree and
+2. The slurm-redis native build system which uses [cmake](https://cmake.org/)
+
+The patch set method is perhaps easier as it does not require that you have the cmake build system installed.  The plugins were developed using the cmake build system, however, and using that method allows you to configure and build these plugins independently from a working slurm installation.  All compile-time options are available in either case.
+
+These are the additional software requirements to run slurm-redis:
+
 - [redis](https://redis.io/), including its `redismodule.h` development header
 - [hiredis](https://github.com/redis/hiredis), the c client for redis, headers and library
 - `libuuid`, its header (uuid/uuid.h) and library `libuuid.so`, (available in utils-linux)
+___
 
+#### Build slurm-redis using provided slurm patch set
 
-### Plugin Configuration
+The patch sets are named according to the version of slurm-redis and the version of slurm to which they apply, for example:
 
-#### Basic configuration
+`slurm-redis-0.1.0-slurm-19.05.patch.bz2` would be the patch you could use for slurm-redis version 0.1.0 that patches over the slurm 19.05 source tree.  Here's an example of using the patch set:
+
+```bash
+# Unpack both tarballs and apply the patch set
+$ tar -xjf slurm-19.05.2.tar.bz2
+$ bunzip2 slurm-redis-0.1.0-slurm-19.05.patch.bz2
+$ cd slurm-19.05.2
+$ patch -p1 < ../slurm-redis-0.1.0-slurm-19.05.patch
+patching file configure.ac
+...
+# Re-run autoreconf (or autogen.sh on 18.08) to apply build system changes
+./autoreconf
+# Configure slurm as you normally would, noting these additional options:
+./configure --help # See section "Advanced configuration"
+...
+  --with-jcr-cache-size=N set jobcomp/redis cache size [128]
+  --with-jcr-cache-ttl=N  set jobcomp/redis cache ttl [120]
+  --with-jcr-fetch-count=N
+                          set jobcomp/redis fetch count [500]
+  --with-jcr-fetch-limit=N
+                          set jobcomp/redis fetch limit [1000]
+  --with-jcr-query-ttl=N  set jobcomp/redis query ttl [60]
+  --with-jcr-ttl=N        set jobcomp/redis ttl: -1=permanent [-1]
+  --with-jcr-tmf=N        set jobcomp/redis date/time format: 0=unix epoch,
+                          1=iso8601 [1]
+...
+```
+___
+
+#### Build slurm-redis using native build system
 
 ```bash
 # CMAKE_INSTALL_PREFIX must be set to the system's library installation prefix,
@@ -59,7 +96,7 @@ $ make
 $ sudo make install
 ```
 
-After installing the plugins, restart `slurmctld` if it was running with a previous `jobcomp_redis.so` loaded. You do not have to restart redis, however, in order to load a newer version of the `slurm_jobcomp.so` plugin, in fact, keys can be lost if you restart redis in between its persistence cycles.  Instead, simply open a redis cli and manually unload the current module, then load the new module (or write a script to do this):
+After installation, restart `slurmctld` if it was running with a previous `jobcomp_redis.so` loaded. You do not have to restart redis, however, in order to load a newer version of the `slurm_jobcomp.so` plugin, in fact, keys can be lost if you restart redis in between its persistence cycles.  Instead, simply open a redis cli and manually unload the current module, then load the new module (or write a script to do this):
 
 ```bash
 redis-cli -h <host>
@@ -70,45 +107,64 @@ OK
 redis-cli> module load /usr/lib64/slurm/redis/slurm_jobcomp.so
 OK
 ```
+___
 
 #### Advanced configuration
 
 ```bash
-# cmake -DUSE_ISO8601 (default)
+$ cmake -DJCR_TMF=N ... # [0 = unix epoch times, 1 = ISO 8601 format] or
+$ ./configure --with-jcr-tmf=N ...
+# The default is 1 (ISO8601).
 
-This setting will cause the slurm jobcomp_redis plugin to send all date/time elements
-as ISO8601 strings, GMT with timezone "Z" (Zero/Zulu), thus all date/times will be
-human-readable and normalized to that timezone.
+# This setting will cause the slurm jobcomp_redis plugin to send all date/time elements
+# either as ISO8601 strings, GMT with timezone "Z" (Zero/Zulu), or as Unix Epoch times.
 
-# cmake -DUSE_ISO8601=0
+$ cmake -DJCR_TTL=N ... # [-1 or a positive integer (seconds)] or
+$ ./configure --with-jcr-ttl=N ...
+# The default is -1: keys are permanent.
 
-This setting will cause all date/times to be stored as integers (redis strings) --
-the number of seconds since the unix epoch.
+# This setting will set the time-to-live in seconds of your job completion data.  If you
+# use the value 86400, for example, your job keys will disappear after 1 day.
 
-# cmake -DTTL=<N> (default -1 = permanent key)
+$ cmake -DJCR_QUERY_TTL=N ... # or
+$ ./configure --with-jcr-query-ttl=N ...
+# The default is 60 seconds.
 
-This setting will set the time-to-live in seconds of your job completion data.  If you
-use -DTTL=86400, your job keys will disappear after 1 day.   The default is -1: keys
-are permanent.  Use this setting if you want a fast but temporary cache of recent job
-data.
+# This setting should not need to be changed.  When clients such as saact request job
+# data, the jobcomp_redis plugin sends the job criteria to redis as a set of transient
+# keys and then issues SLURMJC.MATCH.  The latency between the time that the criteria
+# arrives in redis and the command SLURMJC.FETCH completes in redis is where this setting
+# matters.
 
-# cmake -DQUERY_TTL=<N> (default 60)
+$ cmake -DJCR_FETCH_LIMIT=N ... # or
+$ ./configure --with-jcr-fetch-limit=N ...
+# The default is 1000 job records.
 
-This setting should not need to be changed.  When clients such as saact request job data,
-the jobcomp_redis plugin sends the job criteria to redis as a set of transient keys and
-then issues SLURMJC.MATCH.  The brief latency between the time that the criteria arrives
-in redis and the command SLURMJC.MATCH starts in redis is where this setting matters.
+# The maximum number of jobs that redis will allow to be sent to the client in one
+# iteration of SLURMJC.FETCH.
 
-# cmake -DFETCH_LIMIT=<N> (default 1000)
+$ cmake -DJCR_FETCH_COUNT=N ... # or
+$ ./configure --with-jcr-fetch-count=N ...
+# The default is 500 job records.
 
-The maximum number of jobs redis will allow to be sent to the client in one iteration
-of SLURMJC.FETCH.
+# The maximum number of jobs records that the client would like to receive in one
+# iteration of SLURMJC.FETCH.
 
-# cmake -DFETCH_COUNT=<N> (default 500)
+$ cmake -DJCR_CACHE_SIZE=N ... # or
+$ ./configure --with-jcr-cache-size=N
+# The default is 128 entries (there are separate uid and gid caches).
 
-The maximum number of jobs the client would like to receive in one iteration of
-SLURMJC.FETCH.
+# As job records complete the jobcomp/redis plugin maintains small caches of uid and gid
+# to name, e.g. 0 -> root, to take pressure off distributed LDAP and similar systems.
+
+$ cmake -DJCR_CACHE_TTL=N ... # or
+$ ./configure --with-jcr-cache-ttl=N
+# The default is 120 seconds.
+
+# The time-to-live of the uid and gid cache entries.  If a cache entry is missing or has
+# expired, slurm apis are called to fetch the names.
 ```
+___
 
 ### Slurm Configuration
 
@@ -122,6 +178,8 @@ JobCompPort=<redis listen port, e.g. 6379>
 JobCompType=jobcomp/redis
 #JobCompUser=<unused, redis has no notion of user>
 ```
+
+___
 
 ### Redis Configuration
 
@@ -156,6 +214,8 @@ number of ways to turn that off:
 - `echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled` at system start
 
 There may be some other system settings, e.g. overcommit_memory, that you need to adjust using `/etc/sysctl.conf`.  Refer to the redis log file for more details.
+
+___
 
 ### Usage
 

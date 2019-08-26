@@ -1,0 +1,115 @@
+#
+# MIT License
+#
+# Copyright (c) 2019 Philip Kovacs
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+
+#
+# This macro adds package checks and configure options for the jobcomp/redis
+# plugin. This file is configured with the home build system (cmake) to add
+# settings and defaults for the various configure options
+#
+
+AC_DEFUN([X_AC_SLURM_REDIS],
+[
+    PKG_CHECK_MODULES([HIREDIS], [hiredis >= 0.10.0])
+    PKG_CHECK_MODULES([UUID], [uuid >= 2.0.0])
+    AC_CHECK_HEADER(redismodule.h, [], AC_MSG_ERROR([redismodule.h not found]))
+    AC_DEFINE([SLURM_REDIS_ABI], @SLURM_REDIS_ABI@, "Slurm redis ABI")
+    AC_DEFINE([AUTO_PTR(fn)], __attribute__((cleanup(fn))), [Slurm auto cleanup])
+
+    AC_MSG_CHECKING(for jobcomp/redis cache size)
+    AC_ARG_WITH(jcr-cache-size,
+        AS_HELP_STRING(--with-jcr-cache-size=N,
+            [set jobcomp/redis cache size [@JCR_CACHE_SIZE@]]),
+        [jcr_cache_size="$withval"],
+        [jcr_cache_size="@JCR_CACHE_SIZE@"]
+    )
+    AC_MSG_RESULT([$jcr_cache_size])
+    AC_DEFINE_UNQUOTED(JCR_CACHE_SIZE, [$jcr_cache_size],
+        [Define the size for jobcomp/redis caches])
+
+    AC_MSG_CHECKING(for jobcomp/redis cache ttl)
+    AC_ARG_WITH(jcr-cache-ttl,
+        AS_HELP_STRING(--with-jcr-cache-ttl=N,
+            [set jobcomp/redis cache ttl [@JCR_CACHE_TTL@]]),
+        [jcr_cache_ttl="$withval"],
+        [jcr_cache_ttl="@JCR_CACHE_TTL@"]
+    )
+    AC_MSG_RESULT([$jcr_cache_ttl])
+    AC_DEFINE_UNQUOTED(JCR_CACHE_TTL, [$jcr_cache_ttl],
+        [Define the ttl for jobcomp/redis caches])
+
+    AC_MSG_CHECKING(for jobcomp/redis fetch count)
+    AC_ARG_WITH(jcr-fetch-count,
+        AS_HELP_STRING(--with-jcr-fetch-count=N,
+            [set jobcomp/redis fetch count [@JCR_FETCH_COUNT@]]),
+        [jcr_fetch_count="$withval"],
+        [jcr_fetch_count="@JCR_FETCH_COUNT@"]
+    )
+    AC_MSG_RESULT([$jcr_fetch_count])
+    AC_DEFINE_UNQUOTED(JCR_FETCH_COUNT, [$jcr_fetch_count],
+        [Define the jobcomp/redis fetch count])
+
+    AC_MSG_CHECKING(for jobcomp/redis fetch limit)
+    AC_ARG_WITH(jcr-fetch-limit,
+        AS_HELP_STRING(--with-jcr-fetch-limit=N,
+            [set jobcomp/redis fetch limit [@JCR_FETCH_LIMIT@]]),
+        [jcr_fetch_limit="$withval"],
+        [jcr_fetch_limit="@JCR_FETCH_LIMIT@"]
+    )
+    AC_MSG_RESULT([$jcr_fetch_limit])
+    AC_DEFINE_UNQUOTED(JCR_FETCH_LIMIT, [$jcr_fetch_limit],
+        [Define the jobcomp/redis fetch limit])
+
+    AC_MSG_CHECKING(for jobcomp/redis query ttl)
+    AC_ARG_WITH(jcr-query-ttl,
+        AS_HELP_STRING(--with-jcr-query-ttl=N,
+            [set jobcomp/redis query ttl [@JCR_QUERY_TTL@]]),
+        [jcr_query_ttl="$withval"],
+        [jcr_query_ttl="@JCR_QUERY_TTL@"]
+    )
+    AC_MSG_RESULT([$jcr_query_ttl])
+    AC_DEFINE_UNQUOTED(JCR_QUERY_TTL, [$jcr_query_ttl],
+        [Define the jobcomp/redis query ttl])
+
+    AC_MSG_CHECKING(for jobcomp/redis ttl)
+    AC_ARG_WITH(jcr-ttl,
+        AS_HELP_STRING(--with-jcr-ttl=N,
+            [set jobcomp/redis ttl: -1=permanent [@JCR_TTL@]]),
+        [jcr_ttl="$withval"],
+        [jcr_ttl="@JCR_TTL@"]
+    )
+    AC_MSG_RESULT([$jcr_ttl])
+    AC_DEFINE_UNQUOTED(JCR_TTL, [$jcr_ttl],
+        [Define the jobcomp/redis ttl])
+
+    AC_MSG_CHECKING(for jobcomp/redis date/time format)
+    AC_ARG_WITH(jcr-tmf,
+        AS_HELP_STRING(--with-jcr-tmf=N,
+            [set jobcomp/redis date/time format: 0=unix epoch, 1=iso8601 [@JCR_TMF@]]),
+        [jcr_tmf="$withval"],
+        [jcr_tmf="1"]
+    )
+    AC_MSG_RESULT([$jcr_tmf])
+    AC_DEFINE_UNQUOTED(JCR_TMF, [$jcr_tmf],
+        [Define the date/time format for jobcomp/redis])
+])
