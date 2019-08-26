@@ -126,9 +126,9 @@ int jobcomp_cmd_index(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithCallReply(ctx, reply);
         return REDISMODULE_ERR;
     }
-    if (TTL > 0) {
+    if (JCR_TTL > 0) {
         AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(ctx,
-            "EXPIRE", "sl", idx.str, TTL);
+            "EXPIRE", "sl", idx.str, JCR_TTL);
         if (RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR) {
             RedisModule_ReplyWithCallReply(ctx, reply);
             return REDISMODULE_ERR;
@@ -205,7 +205,7 @@ int jobcomp_cmd_match(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
         return REDISMODULE_ERR;
     }
-    if (RedisModule_SetExpire(matchset_key, QUERY_TTL * 1000)
+    if (RedisModule_SetExpire(matchset_key, JCR_QUERY_TTL * 1000)
         == REDISMODULE_ERR) {
         RedisModule_ReplyWithError(ctx, "failed to set ttl on match set");
         return REDISMODULE_ERR;
@@ -248,15 +248,15 @@ int jobcomp_cmd_fetch(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
         RedisModule_ReplyWithError(ctx, "invalid max count");
         return REDISMODULE_ERR;
     }
-    if (max_count > FETCH_LIMIT) {
-        max_count = FETCH_LIMIT;
+    if (max_count > JCR_FETCH_LIMIT) {
+        max_count = JCR_FETCH_LIMIT;
     }
     RedisModule_ReplyWithArray(ctx, REDISMODULE_POSTPONED_ARRAY_LEN);
 
     count = 0;
     while (count < max_count) {
         AUTO_RMREPLY RedisModuleCallReply *reply = RedisModule_Call(ctx,
-            "ZPOPMIN", "sl", matchset.str, FETCH_COUNT);
+            "ZPOPMIN", "sl", matchset.str, JCR_FETCH_COUNT);
         if ((RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_NULL) ||
             (RedisModule_CallReplyType(reply) != REDISMODULE_REPLY_ARRAY) ||
             (RedisModule_CallReplyLength(reply)) == 0) {

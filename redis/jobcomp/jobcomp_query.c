@@ -354,7 +354,7 @@ int job_query_match(job_query_t qry, const RedisModuleString *matchset)
             sscan_cursor_init_t init = {
                 .ctx = qry->ctx,
                 .set = idx.str,
-                .count = FETCH_COUNT
+                .count = JCR_FETCH_COUNT
             };
             AUTO_PTR(destroy_sscan_cursor) sscan_cursor_t cursor =
                 create_sscan_cursor(&init);

@@ -46,11 +46,7 @@ const char plugin_name[] = "Job completion logging redis plugin";
 const char plugin_type[] = "jobcomp/redis";
 const uint32_t plugin_version = SLURM_VERSION_NUMBER;
 
-#ifdef USE_ISO8601
-const unsigned int _tmf = 1;
-#else
-const unsigned int _tmf = 0;
-#endif
+const unsigned int _tmf = JCR_TMF;
 
 static const char *host = NULL;
 static uint32_t port = 0;
@@ -115,7 +111,7 @@ static int redis_add_job_criteria(const char *key, const List list) {
         redisAppendCommand(ctx, "SADD %s %s", key, value);
         ++pipeline;
     }
-    redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_TTL);
+    redisAppendCommand(ctx, "EXPIRE %s %u", key, JCR_QUERY_TTL);
     ++pipeline;
     return pipeline;
 }
@@ -135,7 +131,7 @@ static int redis_add_job_steps(const char *key, const List list) {
         redisAppendCommand(ctx, "SADD %s %s", key, buf);
         ++pipeline;
     }
-    redisAppendCommand(ctx, "EXPIRE %s %u", key, QUERY_TTL);
+    redisAppendCommand(ctx, "EXPIRE %s %u", key, JCR_QUERY_TTL);
     ++pipeline;
     return pipeline;
 }
@@ -164,10 +160,10 @@ int init(void)
         pass = slurm_get_jobcomp_pass();
     }
     jobcomp_redis_format_init_t format_init = {
-        .user_cache_sz = ID_CACHE_SIZE,
-        .user_cache_ttl = ID_CACHE_TTL,
-        .group_cache_sz = ID_CACHE_SIZE,
-        .group_cache_ttl = ID_CACHE_TTL
+        .user_cache_sz = JCR_CACHE_SIZE,
+        .user_cache_ttl = JCR_CACHE_TTL,
+        .group_cache_sz = JCR_CACHE_SIZE,
+        .group_cache_ttl = JCR_CACHE_TTL
     };
     jobcomp_redis_format_init(&format_init);
     return SLURM_SUCCESS;
@@ -264,9 +260,9 @@ int slurm_jobcomp_log_record(struct job_record *job)
             ++pipeline;
         }
     }
-    if (TTL > 0) {
+    if (JCR_TTL > 0) {
         redisAppendCommand(ctx, "EXPIRE %s:%s %lld", prefix,
-            fields.value[kJobID], TTL);
+            fields.value[kJobID], JCR_TTL);
         ++pipeline;
     }
 
@@ -357,7 +353,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
             redis_field_labels[kNNodes], job_cond->nodes_min,
             redis_field_labels[kNNodes], job_cond->nodes_max);
         redisAppendCommand(ctx, "EXPIRE %s:qry:%s %u", prefix, uuid_s,
-            QUERY_TTL);
+            JCR_QUERY_TTL);
         pipeline += 2;
     }
 
@@ -449,7 +445,7 @@ List slurm_jobcomp_get_jobs(slurmdb_job_cond_t *job_cond)
     do {
         redis_fields_t fields; // do not AUTO_FIELDS
         AUTO_REPLY redisReply *reply = redisCommand(ctx,
-            "SLURMJC.FETCH %s %s %u", prefix, uuid_s, FETCH_COUNT);
+            "SLURMJC.FETCH %s %s %u", prefix, uuid_s, JCR_FETCH_COUNT);
         if (!reply || (reply->type == REDIS_REPLY_NIL) ||
             (reply->type != REDIS_REPLY_ARRAY) ||
             (reply->elements == 0)) {

@@ -70,30 +70,32 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(USE_ISO8601 "Use ISO8601 date/time format in redis" ON)
-
-if(NOT ID_CACHE_SIZE)
-    set(ID_CACHE_SIZE "128")
+if(NOT JCR_CACHE_SIZE)
+    set(JCR_CACHE_SIZE "128")
 endif()
 
-if(NOT ID_CACHE_TTL)
-    set(ID_CACHE_TTL "120")
+if(NOT JCR_CACHE_TTL)
+    set(JCR_CACHE_TTL "120")
 endif()
 
-if(NOT FETCH_COUNT)
-    set(FETCH_COUNT "500")
+if(NOT JCR_FETCH_COUNT)
+    set(JCR_FETCH_COUNT "500")
 endif()
 
-if(NOT FETCH_LIMIT)
-    set(FETCH_LIMIT "1000")
+if(NOT JCR_FETCH_LIMIT)
+    set(JCR_FETCH_LIMIT "1000")
 endif()
 
-if(NOT QUERY_TTL)
-    set(QUERY_TTL "60")
+if(NOT JCR_QUERY_TTL)
+    set(JCR_QUERY_TTL "60")
 endif()
 
-if(NOT TTL)
-    set(TTL "-1")
+if(NOT JCR_TTL)
+    set(JCR_TTL "-1")
+endif()
+
+if(NOT JCR_TMF)
+    set(JCR_TMF "1")
 endif()
 
 # --------------
@@ -122,6 +124,18 @@ include_directories(
 add_subdirectory(common)
 add_subdirectory(redis)
 add_subdirectory(slurm)
+
+# ----------------------
+# Generate a slurm patch
+# ----------------------
+configure_file(
+    ${CMAKE_SOURCE_DIR}/auxdir/x_ac_slurm_redis.m4.in
+    ${CMAKE_BINARY_DIR}/auxdir/x_ac_slurm_redis.m4
+)
+add_custom_target(patch ${CMAKE_SOURCE_DIR}/generate_patch.sh
+    ${CMAKE_INCLUDE_PATH} ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}
+    DEPENDS ${CMAKE_BINARY_DIR}/auxdir/x_ac_slurm_redis.m4
+)
 
 # -----------------
 # Add CPack support
