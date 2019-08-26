@@ -1,0 +1,250 @@
+#!/bin/bash
+
+#
+# MIT License
+#
+# Copyright (c) 2019 Philip Kovacs
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+
+#
+# This patch generator is used to create a patch set against the slurm source
+# tree in order to add the slurm_redis functionality using only autotools and
+# without the need for a separate build system (cmake)
+#
+
+sed_configure_ac()
+{
+echo '\
+s|\(^dnl This needs to come last.*\)|\
+dnl Checks for jobcomp\/redis and its redis module slurm_jobcomp\n\
+X_AC_SLURM_REDIS\n\\
+\1|
+
+s|\(.*\)\(src/plugins/jobcomp/Makefile\)|\1\2\n\
+\1src/plugins/jobcomp/common/Makefile|
+
+s|\(.*\)\(src/plugins/jobcomp/mysql/Makefile\)|\1\2\n\
+\1src/plugins/jobcomp/redis/Makefile|
+
+s|\(.*\)\(src/plugins/route/Makefile\)|\
+\1src/plugins/redis/Makefile\n\
+\1src/plugins/redis/common/Makefile\n\
+\1src/plugins/redis/jobcomp/Makefile\n\
+\1\2|
+'
+}
+
+sed_src_common_makefile()
+{
+echo '\
+s|\(.*\)\(assoc_mgr\.c assoc_mgr\.h.*\)|\
+\1iso8601_format.c i0so8601_format.h \\\\\n\
+\1redis_fields.c redis_fields.h \\\\\n\
+\1stringto.c stringto.h \\\\\n\
+\1\2|
+'
+}
+
+sed_src_plugins_makefile()
+{
+echo '\
+s|\(.*\)\(proctrack.*\)|\
+\1\2\\
+\1redis \\\|
+'
+}
+
+sed_src_plugins_jobcomp_makefile()
+{
+echo '\
+s|\(SUBDIRS = \)\(.*\)|\
+\1common \2 redis|
+'
+}
+
+makefile_src_plugins_jobcomp_common()
+{
+echo '\
+AUTOMAKE_OPTIONS = foreign
+
+AM_CPPFLAGS =\\
+    -I\$(top_srcdir)
+
+noinst_LTLIBRARIES = libcommon.la
+
+libcommon_la_SOURCES=\\
+	ttl_hash.c \\
+	ttl_hash.h
+'
+}
+
+makefile_src_plugins_jobcomp_redis()
+{
+echo '\
+AUTOMAKE_OPTIONS = foreign
+
+AM_CPPFLAGS =\\
+	-I\$(top_srcdir) \\
+	-I\$(top_srcdir)/src \\
+	-I\$(top_srcdir)/src/common \\
+	-I\$(top_srcdir)/src/plugins/jobcomp \\
+	-I\$(top_srcdir)/src/plugins/jobcomp/common \\
+	\$(PTHREAD_CFLAGS) \\
+	\$(HIREDIS_CFLAGS) \\
+	\$(UUID_CFLAGS)
+
+pkglib_LTLIBRARIES = jobcomp_redis.la
+
+jobcomp_redis_la_SOURCES =\\
+	jobcomp_redis.c \\
+	jobcomp_redis_auto.c \\
+	jobcomp_redis_auto.h \\
+	jobcomp_redis_format.c \\
+	jobcomp_redis_format.h
+
+jobcomp_redis_la_LDFLAGS = -module -avoid-version --export-dynamic
+
+jobcomp_redis_la_LIBADD =\\
+	\$(top_builddir)/src/common/libcommon.la \\
+	\$(top_builddir)/src/plugins/jobcomp/common/libcommon.la \\
+	\$(PTHREAD_LIBS) \\
+	\$(HIREDIS_LIBS) \\
+	\$(UUID_LIBS)
+'
+}
+
+makefile_src_plugins_redis()
+{
+echo '\
+SUBDIRS = common jobcomp
+'
+}
+
+makefile_src_plugins_redis_common()
+{
+echo '\
+AUTOMAKE_OPTIONS = foreign
+
+AM_CPPFLAGS =\\
+    -I\$(top_srcdir) \\
+    -I\$(top_srcdir)/src
+
+noinst_LTLIBRARIES = libcommon.la
+
+libcommon_la_SOURCES=\\
+	sscan_cursor.c sscan_cursor.h
+'
+}
+
+makefile_src_plugins_redis_jobcomp()
+{
+echo '\
+AUTOMAKE_OPTIONS = foreign
+
+AM_CPPFLAGS =\\
+	-I\$(top_srcdir) \\
+	-I\$(top_srcdir)/src \\
+	-I\$(top_srcdir)/src/plugins/redis
+
+pkglibdir = \$(libdir)/slurm/redis
+
+pkglib_LTLIBRARIES = slurm_jobcomp.la
+
+slurm_jobcomp_la_SOURCES =\\
+	jobcomp_auto.c \\
+	jobcomp_auto.h \\
+	jobcomp_command.c \\
+	jobcomp_command.h \\
+	jobcomp_query.c \\
+	jobcomp_query.h \\
+	slurm_jobcomp
+
+slurm_jobcomp_la_LDFLAGS = -module -avoid-version --export-dynamic
+
+slurm_jobcomp_la_LIBADD =
+	\$(top_builddir)/src/plugins/redis/common/libcommon.la \\
+	\$(top_builddir)/src/common/libcommon.la
+'
+}
+
+# Test that $1 is a git repo
+git -C $1 rev-parse >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "$1 is not a git repo"
+    exit 2
+fi
+
+# Test that $1 is a clean git repo
+if [ ! -z "$(git status --untracked-files=no --porcelain)" ]; then
+    echo "$1 is not a clean git repo"
+    #exit 2
+fi
+
+# Test that $1/slurm dir exists
+if [ ! -d "$1/slurm" ]; then
+    echo "$1/slurm directory does not exist"
+    exit 2
+fi
+
+# Patch the slurm git tree
+declare -a cmd=(
+    "mkdir -p $1/src/plugins/jobcomp/common"
+    "mkdir -p $1/src/plugins/jobcomp/redis"
+    "mkdir -p $1/src/plugins/redis"
+    "mkdir -p $1/src/plugins/redis/common"
+    "mkdir -p $1/src/plugins/redis/jobcomp"
+    "cp $2/common/*.[ch] $1/src/common/"
+    "cp $2/slurm/common/*.[ch] $1/src/plugins/jobcomp/common/"
+    "cp $2/slurm/jobcomp/*.[ch] $1/src/plugins/jobcomp/redis/"
+    "cp $2/redis/common/*.[ch] $1/src/plugins/redis/common/"
+    "cp $2/redis/jobcomp/*.[ch] $1/src/plugins/redis/jobcomp/"
+    "cp $3/auxdir/x_ac_slurm_redis.m4 $1/auxdir/"
+    "sed -i -e\"$(sed_configure_ac)\" $1/configure.ac"
+    "sed -i -e\"$(sed_src_common_makefile)\" $1/src/common/Makefile.am"
+    "sed -i -e\"$(sed_src_plugins_makefile)\" $1/src/plugins/Makefile.am"
+    "sed -i -e\"$(sed_src_plugins_jobcomp_makefile)\" $1/src/plugins/jobcomp/Makefile.am"
+    "echo \"$(makefile_src_plugins_jobcomp_common)\" > $1/src/plugins/jobcomp/common/Makefile.am"
+    "echo \"$(makefile_src_plugins_jobcomp_redis)\" > $1/src/plugins/jobcomp/redis/Makefile.am"
+    "echo \"$(makefile_src_plugins_redis)\" > $1/src/plugins/redis/Makefile.am"
+    "echo \"$(makefile_src_plugins_redis_common)\" > $1/src/plugins/redis/common/Makefile.am"
+    "echo \"$(makefile_src_plugins_redis_jobcomp)\" > $1/src/plugins/redis/jobcomp/Makefile.am"
+)
+for (( i = 0; i < ${#cmd[@]} ; i++ )); do
+    printf "Running: ${cmd[$i]}\n"
+    eval "${cmd[$i]}"
+    if [ $? -ne 0 ]; then
+        echo "error running: ${cmd[$i]}"
+        exit 1
+    fi
+done;
+
+# Create the patch by combining git diffs of the tracked and untracked files
+# that we changed
+pushd $1
+patch_name="`git rev-parse --abbrev-ref HEAD | sed -e 's/slurm/slurm-redis/'`"
+patch_name+=".patch"
+
+git diff > $3/$patch_name
+git ls-files --others --exclude-standard auxdir |
+    while read -r i; do git diff /dev/null "$i" >> $3/$patch_name; done
+git ls-files --others --exclude-standard src |
+    while read -r i; do git diff /dev/null "$i" >> $3/$patch_name; done
+popd
