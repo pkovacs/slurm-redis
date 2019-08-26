@@ -133,7 +133,8 @@ $ ./configure --with-jcr-query-ttl=N ...
 # This setting should not need to be changed.  When clients such as saact request job
 # data, the jobcomp_redis plugin sends the job criteria to redis as a set of transient
 # keys and then issues SLURMJC.MATCH.  The latency between the time that the criteria
-# arrives in redis and the command SLURMJC.FETCH completes in redis is where this setting # matters.
+# arrives in redis and the command SLURMJC.FETCH completes in redis is where this setting
+# matters.
 
 $ cmake -DJCR_FETCH_LIMIT=N ... # or
 $ ./configure --with-jcr-fetch-limit=N ...
@@ -161,8 +162,7 @@ $ ./configure --with-jcr-cache-ttl=N
 # The default is 120 seconds.
 
 # The time-to-live of the uid and gid cache entries.  If a cache entry is missing or has
-# expired, the slurm api's uid_to_string and gid_to_string are called.  Yes, they too use
-# a caching scheme -- my caches allow for multiple reader concurrency.
+# expired, slurm apis are called to fetch the names.
 ```
 ___
 
