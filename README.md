@@ -11,6 +11,8 @@
 - [Usage](#usage)
 - [FAQ](#faq)
 
+___
+
 ### Purpose and Design
 
 I wanted a fast, lightweight job completion plugin for slurm that has good support for client-side filtering of job completion criteria.  Redis fits this need very nicely because it is memory-based and very fast indeed.  This jobcomp_redis plugin can  produce permanent redis keys or, using redis key expiry, it can produce keys which live only for a duration that you configure.  The jobcomp_redis plugin can be a good complement to accounting storage plugins, e.g. mysql/mariadb.  For example, you could configure the jobcomp_redis plugin so that keys live only for a week, thus implementing a super-fast, memory-based cache of a rolling week's worth of jobs.  If you save the keys permanently (the default), you can configure redis persistence to suit your needs, write scripts to manage your redis job data, etc.
@@ -20,6 +22,7 @@ In terms of design, the jobcomp_redis slurm plugin works with a partner plugin t
 When job data is requested from slurm, jobcomp_redis sends job criteria to redis and then issues the command `SLURMJC.MATCH` to ask redis to perform the job matching.  In this way, we avoid pulling job candidates across the wire just to test if they match which can waste network bandwidth and slow us down.  If matches are found, the slurm-side partner will issue `SLURMJC.FETCH` to receive the job data from redis.
 
 Let me know if you find this plugin useful.  More plugins to follow ...
+___
 
 ### Requirements
 
@@ -34,6 +37,7 @@ These are the additional software requirements to run slurm-redis:
 - [redis](https://redis.io/), including its `redismodule.h` development header
 - [hiredis](https://github.com/redis/hiredis), the c client for redis, headers and library
 - `libuuid`, its header (uuid/uuid.h) and library `libuuid.so`, (available in utils-linux)
+___
 
 #### Build slurm-redis using provided slurm patch set
 
@@ -66,6 +70,7 @@ patching file configure.ac
                           1=iso8601 [1]
 ...
 ```
+___
 
 #### Build slurm-redis using native build system
 
@@ -102,6 +107,7 @@ OK
 redis-cli> module load /usr/lib64/slurm/redis/slurm_jobcomp.so
 OK
 ```
+___
 
 #### Advanced configuration
 
@@ -158,6 +164,7 @@ $ ./configure --with-jcr-cache-ttl=N
 # expired, the slurm api's uid_to_string and gid_to_string are called.  Yes, they too use
 # a caching scheme -- my caches allow for multiple reader concurrency.
 ```
+___
 
 ### Slurm Configuration
 
@@ -171,6 +178,8 @@ JobCompPort=<redis listen port, e.g. 6379>
 JobCompType=jobcomp/redis
 #JobCompUser=<unused, redis has no notion of user>
 ```
+
+___
 
 ### Redis Configuration
 
@@ -205,6 +214,8 @@ number of ways to turn that off:
 - `echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled` at system start
 
 There may be some other system settings, e.g. overcommit_memory, that you need to adjust using `/etc/sysctl.conf`.  Refer to the redis log file for more details.
+
+___
 
 ### Usage
 
