@@ -3,3 +3,7 @@ This file provides a summary of changes in the releases of slurm-redis
 Changes in v0.1.1
 =================
 -- ensure only one redis ping occurs when already connected
+-- add generate_patch script to produce autotools patch sets
+   with a full set of configure options for slurm-redis
+-- rename the compile-time options with a JCR_ prefix so as
+   not to collide with any names in slurm's config.h
