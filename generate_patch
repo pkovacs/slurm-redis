@@ -30,6 +30,20 @@
 # without the need for a separate build system (cmake)
 #
 
+#
+# Usage: generate_patch is not meant to be run directly -- use `make patch`
+#        from the cmake build directory. Make sure the slurm source tree is
+#        git clean (if using git) or a fresh tar unpack from slurm source
+#
+# Example:
+#
+# $ cd slurm-redis
+# $ mkdir build
+# $ cd build
+# $ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INCLUDE_PATH=/home/phil/slurm/ ..
+# $ make patch
+#
+
 sed_configure_ac()
 {
 echo '\
