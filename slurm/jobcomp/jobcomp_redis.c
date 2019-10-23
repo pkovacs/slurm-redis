@@ -189,7 +189,7 @@ int fini(void)
 /*
  * Slurm is sending us the location string from the JobCompLoc config key.
  *
- * We interpret that value as a prefix to be prepending onto redis keys.
+ * We interpret that value as a prefix to be prepended to redis keys.
  * If no location is used, redis job keys will be of the form "job:<id>".
  * If a location prefix is used, keys will of the form "<prefix>:job:<id>".
  * All keys, including the transient query and match keys will also use

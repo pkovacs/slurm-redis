@@ -30,7 +30,7 @@ Two methods are provided for building this package from source:
 1. A patch set that applies patches directly over the slurm source tree and
 2. The slurm-redis native build system which uses [cmake](https://cmake.org/)
 
-The patch set method is perhaps easier as it does not require that you have the cmake build system installed.  The plugins were developed using the cmake build system, however, and using that method allows you to configure and build these plugins independently from a working slurm installation.  All compile-time options are available in either case.
+The patch set method is perhaps easier to use as it does not require the cmake build system. The plugins were developed with cmake, however, and using cmake allows you to configure and build the slurm-redis plugins separately from slurm source tree.  All compile-time options are available in either case.
 
 These are the additional software requirements to run slurm-redis:
 
@@ -51,24 +51,24 @@ $ tar -xjf slurm-19.05.2.tar.bz2
 $ bunzip2 slurm-redis-0.1.0-slurm-19.05.patch.bz2
 $ cd slurm-19.05.2
 $ patch -p1 < ../slurm-redis-0.1.0-slurm-19.05.patch
-patching file configure.ac
-...
+# patching file configure.ac
+# ...
 # Re-run autoreconf (or autogen.sh on 18.08) to apply build system changes
 ./autoreconf
 # Configure slurm as you normally would, noting these additional options:
 ./configure --help # See section "Advanced configuration"
-...
-  --with-jcr-cache-size=N set jobcomp/redis cache size [128]
-  --with-jcr-cache-ttl=N  set jobcomp/redis cache ttl [120]
-  --with-jcr-fetch-count=N
-                          set jobcomp/redis fetch count [500]
-  --with-jcr-fetch-limit=N
-                          set jobcomp/redis fetch limit [1000]
-  --with-jcr-query-ttl=N  set jobcomp/redis query ttl [60]
-  --with-jcr-ttl=N        set jobcomp/redis ttl: -1=permanent [-1]
-  --with-jcr-tmf=N        set jobcomp/redis date/time format: 0=unix epoch,
-                          1=iso8601 [1]
-...
+#  ...
+#  --with-jcr-cache-size=N set jobcomp/redis cache size [128]
+#  --with-jcr-cache-ttl=N  set jobcomp/redis cache ttl [120]
+#  --with-jcr-fetch-count=N
+#                          set jobcomp/redis fetch count [500]
+#  --with-jcr-fetch-limit=N
+#                          set jobcomp/redis fetch limit [1000]
+#  --with-jcr-query-ttl=N  set jobcomp/redis query ttl [60]
+#  --with-jcr-ttl=N        set jobcomp/redis ttl: -1=permanent [-1]
+#  --with-jcr-tmf=N        set jobcomp/redis date/time format: 0=unix epoch,
+#                          1=iso8601 [1]
+#  ...
 ```
 ___
 
