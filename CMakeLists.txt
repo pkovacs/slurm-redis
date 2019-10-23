@@ -26,7 +26,7 @@ cmake_policy(VERSION 3.4.0)
 cmake_minimum_required(VERSION 3.4.0 FATAL_ERROR)
 
 project(slurm-redis
-    VERSION 0.1.1
+    VERSION 0.1.2
     DESCRIPTION "Redis plugins for slurm"
     HOMEPAGE_URL "https://github.com/pkovacs/slurm-redis"
     LANGUAGES C)

@@ -1,5 +1,10 @@
 This file provides a summary of changes in the releases of slurm-redis
 
+Changes in v0.1.2
+=================
+-- release for slurm-19.05.3
+-- patches for slurm-18 will no longer be released
+
 Changes in v0.1.1
 =================
 -- ensure only one redis ping occurs when already connected
