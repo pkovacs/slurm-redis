@@ -1,5 +1,9 @@
 This file provides a summary of changes in the releases of slurm-redis
 
+Changes in v0.1.3
+=================
+-- release for slurm-19.05.5
+
 Changes in v0.1.2
 =================
 -- release for slurm-19.05.3
