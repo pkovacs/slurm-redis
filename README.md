@@ -43,17 +43,17 @@ ___
 
 The patch sets are named according to the version of slurm-redis and the version of slurm to which they apply, for example:
 
-`slurm-redis-0.1.0-slurm-19.05.patch.bz2` would be the patch you could use for slurm-redis version 0.1.0 that patches over the slurm 19.05 source tree.  Here's an example of using the patch set:
+`slurm-redis-0.1.3-slurm-19.05.patch.bz2` would be the patch you could use for slurm-redis version 0.1.3 that patches over the slurm 19.05 source tree.  Here's an example of using the patch set:
 
 ```bash
 # Unpack both tarballs and apply the patch set
-$ tar -xjf slurm-19.05.2.tar.bz2
-$ bunzip2 slurm-redis-0.1.0-slurm-19.05.patch.bz2
-$ cd slurm-19.05.2
-$ patch -p1 < ../slurm-redis-0.1.0-slurm-19.05.patch
+$ tar -xjf slurm-19.05.5.tar.bz2
+$ bunzip2 slurm-redis-0.1.3-slurm-19.05.patch.bz2
+$ cd slurm-19.05.5
+$ patch -p1 < ../slurm-redis-0.1.3-slurm-19.05.patch
 # patching file configure.ac
 # ...
-# Re-run autoreconf (or autogen.sh on 18.08) to apply build system changes
+# Re-run autoreconf to apply build system changes
 ./autoreconf
 # Configure slurm as you normally would, noting these additional options:
 ./configure --help # See section "Advanced configuration"
@@ -87,11 +87,11 @@ ___
 #   - hint: a configured source tree is one in which slurm/slurm.h exists.
 #
 
-$ tar -xjf slurm-redis-0.1.0.tar.bz2
-$ cd slurm-redis-0.1.0
+$ tar -xjf slurm-redis-0.1.3.tar.bz2
+$ cd slurm-redis-0.1.3
 $ mkdir build
 $ cd build
-$ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INCLUDE_PATH=/home/phil/slurm-19.05.2/ ..
+$ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INCLUDE_PATH=/home/phil/slurm-19.05.5/ ..
 $ make
 $ sudo make install
 ```
